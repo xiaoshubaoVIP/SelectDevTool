@@ -105,15 +105,29 @@ class SelectDevice(QWidget):
 
     def start_button(self):
         print("开始")
-        save_res = False
         temp_path = QtCore.QDir(self.line_edit_path.text())
         path = temp_path.absolutePath()
         print('目录:'+path)
         self.text_edit.clear()
-        self.text_edit.append('目录:'+path)
+        # self.text_edit.append('目录:'+path)
         if not os.path.isdir(path):
             print("错误")
             self.text_edit.append(self.error.format("目录错误❌"))
         else:
             print("正确")
             self.text_edit.append(self.valid.format("目录正常✅"))
+            txt_files = [file for file in os.listdir(path) if file.endswith(".log")]
+            if len(txt_files) > 0:
+                self.text_edit.append(self.valid.format("找到log文件✅"))
+                self.log_process(path, txt_files)
+            else:
+                self.text_edit.append(self.error.format("未找到log文件❌"))
+
+
+    def log_process(self, path, log_files):
+        self.line_edit_path.setText(str(self.line_edit_path.text()))
+        for log_file in log_files:
+            file_full_path = str(path + '/' + log_file)
+            with open(file_full_path, "r", encoding="utf-8") as file:
+                for line in file.readlines():
+                    print(line.strip())  # 使用strip()方法去除换行符
