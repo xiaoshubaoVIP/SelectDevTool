@@ -1,12 +1,14 @@
 import os
+import time
 from pathlib import Path
 
 import pandas as pd
 from PyQt5 import QtCore
-from PyQt5.QtCore import QDir
+from PyQt5.QtCore import QDir, ws
 from PyQt5.QtWidgets import QWidget, QPushButton, QLineEdit, QTextEdit, QVBoxLayout, QHBoxLayout, QFileDialog, \
     QComboBox, QLabel
-from openpyxl import load_workbook
+from openpyxl import load_workbook, Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 
 class SelectDevice(QWidget):
@@ -18,6 +20,9 @@ class SelectDevice(QWidget):
 
         #设置文件
         self.set_file_path = None
+
+        #刷选结果
+        self.df = pd.DataFrame()
 
         #实例化按键
         self.btn = QPushButton("打开需要刷选的目录")
@@ -149,7 +154,6 @@ class SelectDevice(QWidget):
             else:
                 self.text_edit.append(self.error.format("未找到log文件❌"))
 
-
     def log_process(self, path, log_files):
         sheet_name = self.cb.currentText()
         print(sheet_name)
@@ -165,4 +169,63 @@ class SelectDevice(QWidget):
             file_full_path = str(path + '/' + log_file)
             with open(file_full_path, "r", encoding="utf-8") as file:
                 for line in file.readlines():
-                    print(line.strip())  # 使用strip()方法去除换行符
+                    # print(line.strip())  # 使用strip()方法去除换行符
+                    sub_string_start = "Graph: mark start "
+                    sub_string_end = "Graph: mark end "
+                    if sub_string_start in line:
+                        print(line.split(sub_string_start, maxsplit=1))
+                    elif sub_string_end in line:
+                        print(line.split(sub_string_end, maxsplit=1))
+
+        self.show_save_dialog()
+
+    def show_save_dialog(self):
+        #获取当前时间作为文件名
+        timestamp = time.time()
+        local_time = time.localtime(timestamp)
+        formatted_time = time.strftime('%Y-%m-%d_%H%M%S', local_time)
+
+        # 使用 os.path.normpath 规范化路径，避免非法字符
+        default_dir = os.path.normpath(QtCore.QDir.currentPath() + '/output/')
+        default_file = self.cb.currentText() + formatted_time + '.xlsx'
+        full_path = os.path.join(default_dir, default_file)  # 使用 os.path.join 处理路径分隔符
+
+        print("保存路径:", default_dir)
+
+        # 确保目录存在，exist_ok=True 避免重复创建错误
+        os.makedirs(default_dir, exist_ok=True)
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            '保存 Excel 文件',
+            full_path,
+            'Excel Files (*.xlsx)'
+        )
+
+        if file_path:
+            print("确认保存:",file_path)
+            self.save_file(file_path)
+        else:
+            print("取消保存")
+
+    def save_file(self, save_file):
+        try:
+            # 初始化 Workbook
+            wb = Workbook()
+            wb_s = wb.active
+
+            # 将 DataFrame 转换为行并写入工作表
+            for row in dataframe_to_rows(self.df, index=False, header=True):
+                wb_s.append(row)
+
+            wb_s.merge_cells('A1:C1')
+            wb_s['A1'] = '合并后的内容'
+            wb.save(save_file)
+
+            print("✅ 文件写入成功！")
+        except Exception as e:
+            print(f"❌ 写入失败，错误信息: {e}")
+            self.text_edit.append(self.error.format("写入excel失败，确保文件在关闭状态❌"))
+
+        # 请求完成
+        self.text_edit.append(self.valid.format("刷选完成✅ "))
