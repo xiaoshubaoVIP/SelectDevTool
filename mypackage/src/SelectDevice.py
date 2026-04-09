@@ -15,8 +15,8 @@ class SelectDevice(QWidget):
         self.warning = '<font color="orange">{}</font>'
         self.valid = '<font color="green">{}</font>'
 
-        #目标写入文件
-        self.des_sheet = None
+        #设置文件
+        self.set_file_path = None
 
         #实例化按键
         self.btn = QPushButton("打开需要刷选的目录")
@@ -48,7 +48,6 @@ class SelectDevice(QWidget):
         self.text_edit = QTextEdit()
         self.text_edit.setStyleSheet("QTextEdit { background-color: white; }")
 
-
         # 读设置信息
         set_path = self.current_path + '/setting/'
         if not os.path.isdir(set_path):
@@ -56,18 +55,15 @@ class SelectDevice(QWidget):
             print("set文件不存在")
             self.text_edit.append(self.error.format("请先在setting目录下添加设置文件❌"))
         else:
-            set_file = Path(set_path + 'setting.xlsx')
-            if set_file.is_file():
+            self.set_file_path = Path(set_path + 'setting.xlsx')
+            if self.set_file_path.is_file():
                 try:
-                    excel_file = pd.ExcelFile(set_file)
+                    excel_file = pd.ExcelFile(self.set_file_path)
                     sheet_names = excel_file.sheet_names
                     self.cb.addItems(sheet_names)
 
-                    self.set_data = pd.read_excel(set_file, dtype=str)  # 以字符串形式打开并读取excel表格
-                    self.set_data = pd.DataFrame(self.set_data)
-                    print(self.set_data)
                     print('set文件存在')
-                    self.text_edit.append(self.valid.format("设置文件读取正常✅"))
+                    self.text_edit.append(self.valid.format("set文件存在✅"))
                 except FileNotFoundError as e:
                     print(f"设置文件打开失败: {e}")
                     self.text_edit.append(self.error.format(f"设置文件打开失败: {e}❌"))
@@ -114,14 +110,21 @@ class SelectDevice(QWidget):
             print("错误")
             self.text_edit.append(self.error.format("目录错误❌"))
         else:
-            print("正确")
-            self.text_edit.append(self.valid.format("目录正常✅"))
-            txt_files = [file for file in os.listdir(path) if file.endswith(".log")]
-            if len(txt_files) > 0:
-                self.text_edit.append(self.valid.format("找到log文件✅"))
-                self.log_process(path, txt_files)
-            else:
-                self.text_edit.append(self.error.format("未找到log文件❌"))
+            print("正常")
+            sheet_name = self.cb.currentText()
+            try:
+                set_data = pd.read_excel(self.set_file_path, sheet_name=sheet_name, dtype=str)  # 以字符串形式打开并读取excel表格
+                set_data = pd.DataFrame(set_data)
+                print(set_data)
+                self.text_edit.append(self.valid.format("目录正常✅"))
+                txt_files = [file for file in os.listdir(path) if file.endswith(".log")]
+                if len(txt_files) > 0:
+                    self.text_edit.append(self.valid.format("找到log文件✅"))
+                    self.log_process(path, txt_files)
+                else:
+                    self.text_edit.append(self.error.format("未找到log文件❌"))
+            except FileNotFoundError as e:
+                print("设置文件打开失败")
 
 
     def log_process(self, path, log_files):

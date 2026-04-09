@@ -25,9 +25,9 @@ class MainWindow(QMainWindow):
 
         #功能模块按键
         self.btn_mod1 = QPushButton("样机刷选", self)
-        self.btn_mod2 = QPushButton("功能模块一", self)
-        self.btn_mod3 = QPushButton("功能模块二", self)
-        self.btn_mod4 = QPushButton("功能模块三", self)
+        self.btn_mod2 = QPushButton("数据采样", self)
+        self.btn_mod3 = QPushButton("迷宫测试", self)
+        self.btn_mod4 = QPushButton("保留", self)
 
         self.btn_mod1.setFixedSize(80,40)
         self.btn_mod2.setFixedSize(80,40)
