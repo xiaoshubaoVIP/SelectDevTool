@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 from PyQt5 import QtCore
+from PyQt5.QtCore import QDir
 from PyQt5.QtWidgets import QWidget, QPushButton, QLineEdit, QTextEdit, QVBoxLayout, QHBoxLayout, QFileDialog, \
     QComboBox, QLabel
 from openpyxl import load_workbook
@@ -89,10 +90,39 @@ class SelectDevice(QWidget):
 
 
     def get_dir(self):
+        # # 1. 实例化对话框
+        # dialog = QFileDialog()
+        # # 2. 设置标题
+        # dialog.setWindowTitle("选择包含log文件的目录")
+        # # 3. 关键设置：设置为目录模式
+        # dialog.setFileMode(QFileDialog.Directory)
+        # # 4. 设置过滤器
+        # dialog.setNameFilters(["log文件 (*.log)"])
+        # # # 5. (可选) 强制使用 Qt 原生样式而非系统样式，以确保过滤器在所有系统上表现一致
+        # dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+        #
+        # # 6. 执行对话框
+        # if dialog.exec_():
+        #     # 获取选中的文件夹路径
+        #     selected_dir = dialog.selectedFiles()[0]
+        #     print(f"你选择的文件夹是: {selected_dir}")
+        #
+        #     # 你可以在这里进一步确认该文件夹下是否有你想要的文件
+        #     # 例如检查该目录下是否存在 .xlsx 文件
+        #     dir_obj = QDir(selected_dir)
+        #     files = dir_obj.entryList(["*.log"])
+        #     if files:
+        #         print(f"该目录下包含 {len(files)} 个 log 文件")
+        #         self.current_path = selected_dir
+        #         self.line_edit_path.setText(selected_dir)
+        #     else:
+        #         print("该目录下没有找到 log 文件")
+
         dialog = QFileDialog()
         dialog.options = QFileDialog.Options()
         dialog.options |= QFileDialog.ShowDirsOnly
-        folder_path = QFileDialog.getExistingDirectory(self, "选择文件夹", options=dialog.options)
+        # dialog.setFileMode(QFileDialog.ExistingFiles)
+        folder_path = dialog.getExistingDirectory(self, "选择文件夹", options=dialog.options)
 
         if folder_path:
             print(f"选择的文件夹：{folder_path}")
@@ -111,24 +141,26 @@ class SelectDevice(QWidget):
             self.text_edit.append(self.error.format("目录错误❌"))
         else:
             print("正常")
-            sheet_name = self.cb.currentText()
-            try:
-                set_data = pd.read_excel(self.set_file_path, sheet_name=sheet_name, dtype=str)  # 以字符串形式打开并读取excel表格
-                set_data = pd.DataFrame(set_data)
-                print(set_data)
-                self.text_edit.append(self.valid.format("目录正常✅"))
-                txt_files = [file for file in os.listdir(path) if file.endswith(".log")]
-                if len(txt_files) > 0:
-                    self.text_edit.append(self.valid.format("找到log文件✅"))
-                    self.log_process(path, txt_files)
-                else:
-                    self.text_edit.append(self.error.format("未找到log文件❌"))
-            except FileNotFoundError as e:
-                print("设置文件打开失败")
+            self.text_edit.append(self.valid.format("目录正常✅"))
+            txt_files = [file for file in os.listdir(path) if file.endswith(".log")]
+            if len(txt_files) > 0:
+                self.text_edit.append(self.valid.format("目录存在log文件✅"))
+                self.log_process(path, txt_files)
+            else:
+                self.text_edit.append(self.error.format("未找到log文件❌"))
 
 
     def log_process(self, path, log_files):
-        self.line_edit_path.setText(str(self.line_edit_path.text()))
+        sheet_name = self.cb.currentText()
+        print(sheet_name)
+        try:
+            set_data = pd.read_excel(self.set_file_path, sheet_name=sheet_name, dtype=str)  # 以字符串形式打开并读取excel表格
+            set_data = pd.DataFrame(set_data)
+            print(set_data)
+            self.text_edit.append(self.valid.format(sheet_name+"配置文件打开✅"))
+        except FileNotFoundError as e:
+            self.text_edit.append(self.error.format(sheet_name+"配置文件打开❌"))
+
         for log_file in log_files:
             file_full_path = str(path + '/' + log_file)
             with open(file_full_path, "r", encoding="utf-8") as file:
