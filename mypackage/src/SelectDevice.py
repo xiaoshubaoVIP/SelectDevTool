@@ -2,6 +2,7 @@ import os
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from PyQt5 import QtCore
 from PyQt5.QtCore import QDir, ws
@@ -160,10 +161,25 @@ class SelectDevice(QWidget):
         try:
             set_data = pd.read_excel(self.set_file_path, sheet_name=sheet_name, dtype=str)  # 以字符串形式打开并读取excel表格
             set_data = pd.DataFrame(set_data)
+
+            #self.df['条件'] = set_data['条件']                  #沿用配置文件的行名
+            self.df = set_data[['条件', '最小值', '最大值']].copy()
+
             print(set_data)
             self.text_edit.append(self.valid.format(sheet_name+"配置文件打开✅"))
         except FileNotFoundError as e:
             self.text_edit.append(self.error.format(sheet_name+"配置文件打开❌"))
+
+        data = pd.DataFrame()
+        data.index = ['条件','UL烟雾-增量比值', 'UL烟雾-增量比值变化率', 'UL烟雾-计数', 'UL烟雾-PPM', 'UL烟雾-方差和平均值',
+                      'PU烟雾-增量比值', 'PU烟雾-增量比值变化率', 'PU烟雾-计数', 'PU烟雾-PPM', 'PU烟雾-方差和平均值']
+
+        increment_ration = []
+        increment_ration_of_change = []
+        rise_cnt = []
+        average_value = []
+        variance_value = []
+        alarm_flag = False
 
         for log_file in log_files:
             file_full_path = str(path + '/' + log_file)
@@ -172,11 +188,50 @@ class SelectDevice(QWidget):
                     # print(line.strip())  # 使用strip()方法去除换行符
                     sub_string_start = "Graph: mark start "
                     sub_string_end = "Graph: mark end "
-                    if sub_string_start in line:
-                        print(line.split(sub_string_start, maxsplit=1))
-                    elif sub_string_end in line:
-                        print(line.split(sub_string_end, maxsplit=1))
+                    if sub_string_start in line: #开始标记，获取设备编号
+                        sub_line = line.split(sub_string_start, maxsplit=1)
+                        sub_line = sub_line[1].replace('"','').split('-', maxsplit=1)
+                        dev_name = sub_line[0]
+                        data.loc[:, dev_name] = 0
+                        print(dev_name)
+                    elif sub_string_end in line: #结束标记
+                        # print(line.split(sub_string_end, maxsplit=1))
+                        print(dev_name+"测试结束")
+                    else:
+                        sub_line = line.split("Receive: ", maxsplit=1)
+                        sub_line = sub_line[1].replace('"','')
+                        if len(sub_line) > 30:
+                            if (alarm_flag == False) and (int('0x' + sub_line[13:15], 16) == 0x07):#报警后，结束计算
+                                alarm_flag = True
+                                print("报警了")
+                                print("增量比值: 均值", np.mean(increment_ration), "最大值:", np.max(increment_ration),
+                                      "最小值:", np.min(increment_ration))
+                                print("增量比值变化率: 均值", np.mean(increment_ration_of_change),
+                                      "最大值:", np.max(increment_ration_of_change), "最小值:",
+                                      np.min(increment_ration_of_change))
+                                print("计数: 均值", np.mean(rise_cnt), "最大值:", np.max(rise_cnt),
+                                      "最小值:", np.min(rise_cnt))
+                                print("平均值: 均值", np.mean(average_value), "最大值:", np.max(average_value),
+                                      "最小值:", np.min(average_value))
+                                print("方差: 均值", np.mean(variance_value), "最大值:", np.max(variance_value),
+                                      "最小值:", np.min(variance_value))
+                            # print("---------------------------------------")
+                            # print("报警增量电压:", sub_line[21:23], sub_line[24:26])#报警电压差值，#偏移量*3+12
+                            # print("增量比值:", sub_line[120:122], sub_line[123:125])#增量比值
+                            # print("增量比值变化率:", sub_line[126:128], sub_line[129:131])#增量比值变化率
+                            # print("计数:", sub_line[132:134], sub_line[135:137])#计数
+                            # print("平均值:", sub_line[138:140], sub_line[141:143])#平均值
+                            # print("方差:", sub_line[144:146], sub_line[147:149])#方差
 
+                            increment_ration.append(int('0x' + sub_line[120:122] + sub_line[123:125], 16))
+                            increment_ration_of_change.append(int('0x' + sub_line[126:128] + sub_line[129:131], 16))
+                            rise_cnt.append(int('0x' + sub_line[132:134] + sub_line[135:137], 16))
+                            average_value.append(int('0x' + sub_line[138:140] + sub_line[141:143], 16))
+                            variance_value.append(int('0x' + sub_line[144:146] + sub_line[147:149], 16))
+
+
+
+        print("数据:",data)
         self.show_save_dialog()
 
     def show_save_dialog(self):
@@ -210,18 +265,7 @@ class SelectDevice(QWidget):
 
     def save_file(self, save_file):
         try:
-            # 初始化 Workbook
-            wb = Workbook()
-            wb_s = wb.active
-
-            # 将 DataFrame 转换为行并写入工作表
-            for row in dataframe_to_rows(self.df, index=False, header=True):
-                wb_s.append(row)
-
-            wb_s.merge_cells('A1:C1')
-            wb_s['A1'] = '合并后的内容'
-            wb.save(save_file)
-
+            print(self.df)
             print("✅ 文件写入成功！")
         except Exception as e:
             print(f"❌ 写入失败，错误信息: {e}")
