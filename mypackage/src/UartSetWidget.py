@@ -1,4 +1,6 @@
+import configparser
 import sys
+from pathlib import Path
 
 from PyQt5 import QtCore
 from PyQt5.QtCore import *
@@ -6,43 +8,55 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import QWidget, QListWidget, QStackedWidget, QHBoxLayout, QFormLayout, QLineEdit, QRadioButton, \
     QLabel, QCheckBox, QApplication, QDesktopWidget, QButtonGroup, QVBoxLayout, QPushButton, QSizePolicy, QMessageBox, \
     QComboBox
-from pandas.io.pytables import Fixed
 
+import configparser
 
 class UartSetWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowFlags(Qt.FramelessWindowHint|Qt.SubWindow)
-        self.select_data = None
-        self.msgBox = None
-        self.table_display_data = None
+        self.setWindowFlags(Qt.SubWindow)
+
+        com_list = ['COM0']
+        baud_list = ['4800', '9600', '19200', '115200']
+        data_list = ['Data5', 'Data6', 'Data7', 'Data8']
+        stop_list = ['OneStop', 'OneAndHalfStop', 'TwoStop']
+        parity_list = ['NoParity', 'EvenParity', 'OddParity', 'SpaceParity', 'MarkParity']
+
+        ini_path = QtCore.QDir.currentPath() + '/setting/' + 'setting.ini'
+        conf = configparser.ConfigParser()  # 需要实例化一个ConfigParser对象
+        if Path(ini_path).is_file():
+            conf.read(ini_path, encoding='utf-8')
 
         # 数据
         self.cb_com = QComboBox()
         self.cb_com.setFixedSize(200, 30)
         self.cb_com.setStyleSheet("QComboBox { background-color: white; }")
-        self.cb_com.addItems(["COM3"])
+        self.cb_com.addItems(com_list)
 
         self.cb_baud = QComboBox()
         self.cb_baud.setFixedSize(200, 30)
         self.cb_baud.setStyleSheet("QComboBox { background-color: white; }")
-        self.cb_baud.addItems(["9600"])
+        self.cb_baud.addItems(baud_list)
+        self.cb_baud.setCurrentIndex(baud_list.index(conf['uart']['bound']))
 
         self.cb_data_bit = QComboBox()
         self.cb_data_bit.setFixedSize(200, 30)
         self.cb_data_bit.setStyleSheet("QComboBox { background-color: white; }")
-        self.cb_data_bit.addItems(["Data8"])
+        self.cb_data_bit.addItems(data_list)
+        self.cb_data_bit.setCurrentIndex(data_list.index(conf['uart']['data']))
 
         self.cb_stop_bit = QComboBox()
         self.cb_stop_bit.setFixedSize(200, 30)
         self.cb_stop_bit.setStyleSheet("QComboBox { background-color: white; }")
-        self.cb_stop_bit.addItems(["OneStop"])
+        self.cb_stop_bit.addItems(stop_list)
+        self.cb_stop_bit.setCurrentIndex(stop_list.index(conf['uart']['stop']))
 
         self.cb_parity_bit = QComboBox()
         self.cb_parity_bit.setFixedSize(200, 30)
         self.cb_parity_bit.setStyleSheet("QComboBox { background-color: white; }")
-        self.cb_parity_bit.addItems(["NoParity"])
+        self.cb_parity_bit.addItems(parity_list)
+        self.cb_parity_bit.setCurrentIndex(parity_list.index(conf['uart']['parity']))
 
         self.push_button_1 = QPushButton('连接串口')
         self.push_button_1.setStyleSheet("background-color: rgb(255,255,255); color: black;")
@@ -96,8 +110,6 @@ class UartSetWidget(QWidget):
 
         layout_2.addWidget(self.push_button_1)
         layout_2.addWidget(self.push_button_2)
-        # layout_2.addWidget(self.push_button_1, alignment=Qt.AlignHCenter)
-        # layout_2.addWidget(self.push_button_2, alignment=Qt.AlignHCenter)
 
         layout.addLayout(layout_1)
         layout.addLayout(layout_2)
