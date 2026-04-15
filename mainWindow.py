@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QTextEdit, QMainW
     QDesktopWidget, QLabel, QLineEdit, QPushButton, QFileDialog, QStackedWidget, QFormLayout
 
 from mypackage.src.SelectDevice import SelectDevice
+from mypackage.src.UartSetWidget import UartSetWidget
 
 print("pyqt5:v"+QtCore.QT_VERSION_STR)
 print(QtCore.QT_VERSION_STR)
@@ -24,8 +25,8 @@ class MainWindow(QMainWindow):
         self.set_bar()
 
         #功能模块按键
-        self.btn_mod1 = QPushButton("样机刷选", self)
-        self.btn_mod2 = QPushButton("数据采样", self)
+        self.btn_mod1 = QPushButton("数据采样", self)
+        self.btn_mod2 = QPushButton("样机刷选", self)
         self.btn_mod3 = QPushButton("迷宫测试", self)
         self.btn_mod4 = QPushButton("保留", self)
 
@@ -57,14 +58,14 @@ class MainWindow(QMainWindow):
         layout_2 = QHBoxLayout()
 
         #堆栈窗口
-        self.stack1 = SelectDevice()
-        self.stack2 = QWidget(self)
+        self.stack1 = QWidget(self)
+        self.stack2 = SelectDevice()
         self.stack3 = QWidget(self)
         self.stack4 = QWidget(self)
 
         #stack1组件
         # stack2组件
-        self.stack2_ui()
+        self.stack1_ui()
         # stack3组件
         self.stack3_ui()
         # stack4组件
@@ -133,7 +134,7 @@ class MainWindow(QMainWindow):
         self.btn_mod3.setStyleSheet("background-color: rgb(255,255,255);")
         self.btn_mod4.setStyleSheet("background-color: rgb(190,226,224); color: black; border-radius: 0px;")
 
-    def stack2_ui(self):
+    def stack1_ui(self):
         layout = QFormLayout()
         layout1 = QHBoxLayout()
         layout1.addWidget(QLabel("敬请期待1"))
@@ -154,24 +155,6 @@ class MainWindow(QMainWindow):
         layout.addRow(layout1)
         self.stack4.setLayout(layout)
 
-    def open_set_file(self):
-        print("设置")
-        temp_path = QtCore.QDir(QtCore.QDir.currentPath())
-        set_path = temp_path.absolutePath()+'/setting/'
-
-        if os.path.isdir(set_path):
-            dialog = QFileDialog(self, "打开设置文件")
-            dialog.setDirectory(set_path)
-            dialog.setFileMode(QFileDialog.AnyFile)
-            dialog.setOption(QFileDialog.ReadOnly)
-
-            if dialog.exec_():
-                select_set_file = dialog.selectedFiles()[0]
-                os.startfile(select_set_file)
-                print(f"选择设置文件：{select_set_file}")
-            else:
-                print("打开设置文件失败")
-
     def set_bar(self):
         # 实例化主窗口的QMenuBar对象
         bar = self.menuBar()
@@ -190,9 +173,36 @@ class MainWindow(QMainWindow):
 
         # 向菜单栏中添加“设置”
         menu_set = bar.addMenu('设置')
-        resset_file = QAction('配置文件', self)
-        menu_set.addAction(resset_file)
-        menu_set.triggered[QAction].connect(self.open_set_file)
+        uart_set = QAction('串口配置', self)
+        file_set = QAction('配置文件', self)
+        menu_set.addAction(uart_set)
+        menu_set.addAction(file_set)
+        menu_set.triggered[QAction].connect(self.set_function)
+
+    def set_function(self, action):
+        if action.triggered:
+            print(action.text())
+            if action.text() == '串口配置':
+                print("配置。。。")
+                self.ex = UartSetWidget()
+                self.ex.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint)
+                self.ex.show()
+            elif action.text() == '配置文件':
+                temp_path = QtCore.QDir(QtCore.QDir.currentPath())
+                set_path = temp_path.absolutePath()+'/setting/'
+
+                if os.path.isdir(set_path):
+                    dialog = QFileDialog(self, "打开设置文件")
+                    dialog.setDirectory(set_path)
+                    dialog.setFileMode(QFileDialog.AnyFile)
+                    dialog.setOption(QFileDialog.ReadOnly)
+
+                    if dialog.exec_():
+                        select_set_file = dialog.selectedFiles()[0]
+                        os.startfile(select_set_file)
+                        print(f"选择设置文件：{select_set_file}")
+                    else:
+                        print("打开设置文件失败")
 
     def center(self):
         # 获取屏幕的大小
