@@ -8,6 +8,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QTextEdit, QMainWindow, QApplication, QAction, \
     QDesktopWidget, QLabel, QLineEdit, QPushButton, QFileDialog, QStackedWidget, QFormLayout
 
+from mypackage.src.SampleData import SampleData
 from mypackage.src.SelectDevice import SelectDevice
 from mypackage.src.UartSetWidget import UartSetWidget
 
@@ -59,7 +60,7 @@ class MainWindow(QMainWindow):
         layout_2 = QHBoxLayout()
 
         #堆栈窗口
-        self.stack1 = QWidget(self)
+        self.stack1 = SampleData()
         self.stack2 = SelectDevice()
         self.stack3 = QWidget(self)
         self.stack4 = QWidget(self)
