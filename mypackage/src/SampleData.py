@@ -1,9 +1,7 @@
 import os
 import time
-from pathlib import Path
 
-import numpy as np
-import pandas as pd
+import serial
 from PyQt5 import QtCore
 from PyQt5.QtCore import QDir, ws, Qt
 from PyQt5.QtGui import QPen, QBrush, QColor
@@ -12,6 +10,9 @@ from PyQt5.QtWidgets import QWidget, QPushButton, QLineEdit, QTextEdit, QVBoxLay
 
 from QCustomPlot_PyQt5 import QCustomPlot
 
+from mypackage.src.UartSetWidget import UartSetWidget
+
+
 class SampleData(QWidget):
     def __init__(self):
         super(SampleData, self).__init__()
@@ -19,34 +20,38 @@ class SampleData(QWidget):
         self.warning = '<font color="orange">{}</font>'
         self.valid = '<font color="green">{}</font>'
 
+        #串口对象
+        self.set_uart_form = None
+        self.ser = None
+
         #设置文件
         self.set_file_path = None
 
         #实例化按键
-        self.btn = QPushButton("打开需要刷选的目录")
-        self.btn.setStyleSheet("background-color: rgb(225,225,225); color: black;")
-        self.btn.setFixedHeight(40)
-        self.btn.clicked.connect(self.get_dir)
+        self.push_button_open = QPushButton("打开串口")
+        self.push_button_open.setStyleSheet("background-color: rgb(225,225,225); color: black;")
+        self.push_button_open.setFixedSize(60, 25)
+        self.push_button_open.clicked.connect(self.open_close_uart)
 
-        #文本框设定
-        self.current_path = QtCore.QDir.currentPath()
-        self.line_edit_path = QLineEdit(str(self.current_path))
-        self.line_edit_path.setFixedHeight(40)
-        self.line_edit_path.setStyleSheet("QLineEdit { background-color: white; }")
+        #串口基本信息
+        self.label_uart_port = QLabel(str('COM3'))
+        self.label_uart_port.setFixedSize(40, 25)
+        self.label_uart_port.setStyleSheet("QLabel { background-color: white; }")
+        self.label_uart_baud = QLabel(str('9600'))
+        self.label_uart_baud.setFixedSize(40, 25)
+        self.label_uart_baud.setStyleSheet("QLabel { background-color: white; }")
 
-        #加载所有机型
-        self.label_device = QLabel("选定机型")
-        self.label_device.setStyleSheet("background-color: rgb(225,225,225); color: black;")
-        self.label_device.setFixedHeight(40)
-        self.cb = QComboBox()
-        self.cb.setFixedHeight(40)
-        self.cb.setStyleSheet("QComboBox { background-color: white; }")
+        #设置串口
+        self.push_button_set = QPushButton('设置串口')
+        self.push_button_set.setStyleSheet("background-color: rgb(225,225,225); color: black;")
+        self.push_button_set.setFixedSize(100, 25)
+        self.push_button_set.clicked.connect(self.set_uart_function)
 
-        #开始按键
-        self.push_button_start = QPushButton('开始')
-        self.push_button_start.setStyleSheet("background-color: rgb(255,255,255); color: black;")
-        self.push_button_start.setFixedSize(100, 40)
-        self.push_button_start.clicked.connect(self.start_button)
+        #保存日志
+        self.push_button_save = QPushButton('保存日志')
+        self.push_button_save.setStyleSheet("background-color: rgb(225,225,225); color: black;")
+        self.push_button_save.setFixedSize(100, 25)
+        self.push_button_save.clicked.connect(self.show_save_dialog)
 
         #实例化textEdit并加入布局
         self.text_edit = QTextEdit()
@@ -68,17 +73,17 @@ class SampleData(QWidget):
         stack_main_layout = QVBoxLayout()
         stack_layout_1 = QHBoxLayout()
         stack_layout_2 = QHBoxLayout()
-        stack_layout_2_1 = QHBoxLayout()
-        stack_layout_2_2 = QHBoxLayout()
         # 1. 创建一个水平方向的 QSplitter
         splitter = QSplitter(Qt.Horizontal)
 
         #并加入布局
-        stack_layout_1.addWidget(self.btn)
-        stack_layout_1.addWidget(self.line_edit_path)
-        stack_layout_1.addWidget(self.label_device)
-        stack_layout_1.addWidget(self.cb)
-        stack_layout_1.addWidget(self.push_button_start)
+        stack_layout_1.addWidget(self.push_button_open)
+        stack_layout_1.addWidget(self.label_uart_port)
+        stack_layout_1.addWidget(self.label_uart_baud)
+        stack_layout_1.addWidget(self.push_button_set)
+        stack_layout_1.addWidget(self.push_button_save)
+        stack_layout_1.setAlignment(QtCore.Qt.AlignLeft)
+
         splitter.addWidget(self.text_edit)
         splitter.addWidget(self.customPlot)
 
@@ -91,6 +96,39 @@ class SampleData(QWidget):
         stack_main_layout.addLayout(stack_layout_2)
         self.setLayout(stack_main_layout)
 
+    @staticmethod
+    def open_close_uart(self):
+        # self.set_uart_form = UartSetWidget()
+        print("open and close")
+
+    def set_uart_function(self):
+        self.set_uart_form = UartSetWidget()
+        self.set_uart_form.uart_process_signal.connect(self.uart_process_signal)
+        self.set_uart_form.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint)
+        self.set_uart_form.show()
+
+    # @staticmethod
+    def uart_process_signal(self, cmd, param):
+        print('串口参数:',param)
+        self.ser = serial.Serial()  # 配置串口参数
+        self.ser.port = param['port']
+        self.ser.baudrate = param['baudrate']
+        self.ser.bytesize = param['bytesize']
+        self.ser.parity = param['parity']
+        self.ser.stopbits = param['stopbits']
+        self.ser.timeout = 1
+
+        print(f"串口: {self.ser.name}", self.ser.baudrate, self.ser.bytesize, self.ser.parity, self.ser.stopbits, self.ser.timeout)
+
+        if cmd == 'close':
+            print("串口已连接，关闭")
+            self.ser.close()
+        elif cmd == 'open':
+            try:
+                print("串口被打开")
+                self.ser.open()
+            except serial.SerialException as e:
+                print(f"操作串口时出现错误: {e}")
 
     def get_dir(self):
         dialog = QFileDialog()
@@ -104,9 +142,6 @@ class SampleData(QWidget):
             self.current_path = folder_path
             self.line_edit_path.setText(folder_path)
 
-    def start_button(self):
-        print("开始")
-
     def show_save_dialog(self):
         #获取当前时间作为文件名
         timestamp = time.time()
@@ -114,8 +149,8 @@ class SampleData(QWidget):
         formatted_time = time.strftime('%Y-%m-%d_%H%M%S', local_time)
 
         # 使用 os.path.normpath 规范化路径，避免非法字符
-        default_dir = os.path.normpath(QtCore.QDir.currentPath() + '/output/')
-        default_file = self.cb.currentText() + formatted_time + '.xlsx'
+        default_dir = os.path.normpath(QtCore.QDir.currentPath() + '/save/')
+        default_file = self.label_uart_port.currentText() + formatted_time + '.txt'
         full_path = os.path.join(default_dir, default_file)  # 使用 os.path.join 处理路径分隔符
 
         print("保存路径:", default_dir)
@@ -127,7 +162,7 @@ class SampleData(QWidget):
             self,
             '保存 Excel 文件',
             full_path,
-            'Excel Files (*.xlsx)'
+            'Excel Files (*.txt)'
         )
 
         if file_path:
