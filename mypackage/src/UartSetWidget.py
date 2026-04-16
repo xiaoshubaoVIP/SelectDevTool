@@ -9,6 +9,8 @@ from PyQt5.QtWidgets import QWidget, QListWidget, QStackedWidget, QHBoxLayout, Q
     QLabel, QCheckBox, QApplication, QDesktopWidget, QButtonGroup, QVBoxLayout, QPushButton, QSizePolicy, QMessageBox, \
     QComboBox
 
+import serial.tools.list_ports
+
 import configparser
 
 class UartSetWidget(QWidget):
@@ -17,46 +19,58 @@ class UartSetWidget(QWidget):
 
         self.setWindowFlags(Qt.SubWindow)
 
-        com_list = ['COM0']
-        baud_list = ['4800', '9600', '19200', '115200']
-        data_list = ['Data5', 'Data6', 'Data7', 'Data8']
-        stop_list = ['OneStop', 'OneAndHalfStop', 'TwoStop']
-        parity_list = ['NoParity', 'EvenParity', 'OddParity', 'SpaceParity', 'MarkParity']
+        # list_ports.comports()函数来获取可用的串口端口
+        self.ports = serial.tools.list_ports.comports()
 
-        ini_path = QtCore.QDir.currentPath() + '/setting/' + 'setting.ini'
+        #显示数据
+        self.list_port = []
+        for port in sorted(self.ports):
+            self.list_port.append(port.name)
+        self.list_baud = ['4800', '9600', '19200', '115200']
+        self.dict_data = {'Data5':5, 'Data6':6, 'Data7':7, 'Data8':8}
+        self.dict_stop = {'OneStop':1, 'OneAndHalfStop':1.5, 'TwoStop':2}
+        self.dict_parity = {'NoParity':'N', 'EvenParity':'E', 'OddParity':'O', 'SpaceParity':'S', 'MarkParity':'M'}
+
+
+        #读取ini配置文件
+        self.ini_path = QtCore.QDir.currentPath() + '/setting/' + 'setting.ini'
         conf = configparser.ConfigParser()  # 需要实例化一个ConfigParser对象
-        if Path(ini_path).is_file():
-            conf.read(ini_path, encoding='utf-8')
+        if Path(self.ini_path).is_file():
+            conf.read(self.ini_path, encoding='utf-8')
 
-        # 数据
+        # 串口配置下拉框
         self.cb_com = QComboBox()
         self.cb_com.setFixedSize(200, 30)
         self.cb_com.setStyleSheet("QComboBox { background-color: white; }")
-        self.cb_com.addItems(com_list)
+        self.cb_com.addItems(self.list_port)
+        self.cb_com.setCurrentIndex(self.list_port.index(conf['uart']['port']))
 
         self.cb_baud = QComboBox()
         self.cb_baud.setFixedSize(200, 30)
         self.cb_baud.setStyleSheet("QComboBox { background-color: white; }")
-        self.cb_baud.addItems(baud_list)
-        self.cb_baud.setCurrentIndex(baud_list.index(conf['uart']['bound']))
+        self.cb_baud.addItems(self.list_baud)
+        self.cb_baud.setCurrentIndex(self.list_baud.index(conf['uart']['bound']))
 
         self.cb_data_bit = QComboBox()
         self.cb_data_bit.setFixedSize(200, 30)
         self.cb_data_bit.setStyleSheet("QComboBox { background-color: white; }")
-        self.cb_data_bit.addItems(data_list)
-        self.cb_data_bit.setCurrentIndex(data_list.index(conf['uart']['data']))
+        list_data = list(self.dict_data.keys())
+        self.cb_data_bit.addItems(list_data)
+        self.cb_data_bit.setCurrentIndex(list_data.index(conf['uart']['data']))
 
         self.cb_stop_bit = QComboBox()
         self.cb_stop_bit.setFixedSize(200, 30)
         self.cb_stop_bit.setStyleSheet("QComboBox { background-color: white; }")
-        self.cb_stop_bit.addItems(stop_list)
-        self.cb_stop_bit.setCurrentIndex(stop_list.index(conf['uart']['stop']))
+        list_stop = list(self.dict_stop.keys())
+        self.cb_stop_bit.addItems(list_stop)
+        self.cb_stop_bit.setCurrentIndex(list_stop.index(conf['uart']['stop']))
 
         self.cb_parity_bit = QComboBox()
         self.cb_parity_bit.setFixedSize(200, 30)
         self.cb_parity_bit.setStyleSheet("QComboBox { background-color: white; }")
-        self.cb_parity_bit.addItems(parity_list)
-        self.cb_parity_bit.setCurrentIndex(parity_list.index(conf['uart']['parity']))
+        list_parity = list(self.dict_parity.keys())
+        self.cb_parity_bit.addItems(list_parity)
+        self.cb_parity_bit.setCurrentIndex(list_parity.index(conf['uart']['parity']))
 
         self.push_button_1 = QPushButton('连接串口')
         self.push_button_1.setStyleSheet("background-color: rgb(255,255,255); color: black;")
@@ -122,14 +136,55 @@ class UartSetWidget(QWidget):
         self.setGeometry(300, 100, 360, 240)
         self.center()
 
+        self.bt_connect()
+
+    def save_ini(self):
+        config = configparser.ConfigParser()  # 需要实例化一个ConfigParser对象
+        if Path(self.ini_path).is_file():
+            config.read(self.ini_path, encoding='utf-8')
+            config.set('uart', 'port', self.cb_com.currentText())
+            config.set('uart', 'bound', self.cb_baud.currentText())
+            config.set('uart', 'data', self.cb_data_bit.currentText())
+            config.set('uart', 'stop',self.cb_stop_bit.currentText())
+            config.set('uart', 'parity',  self.cb_parity_bit.currentText())
+
+            with open(self.ini_path, 'w') as configfile:
+                config.write(configfile)
+
     # @staticmethod
     def bt_connect(self):
-        print("连接串口")
-        self.close()
+        ser = serial.Serial()  # 配置串口参数
+        ser.port = self.cb_com.currentText()
+        ser.baudrate = int(self.cb_baud.currentText())
+        ser.bytesize = self.dict_data.get(self.cb_data_bit.currentText(), 8)
+        ser.parity = self.dict_parity.get(self.cb_parity_bit.currentText(), 'N')
+        ser.stopbits = self.dict_stop.get(self.cb_stop_bit.currentText(), 1)
+        ser.timeout = 1  # 打开串口
+
+        print(f"串口: {ser.name}", ser.baudrate, ser.bytesize, ser.parity, ser.stopbits, ser.timeout)
+
+        if ser.is_open:
+            print("串口已连接，关闭")
+            ser.close()
+            self.push_button_1.setText('连接串口')
+            self.cb_com.setEnabled(True)
+        else:
+            try:
+                print("串口被打开")
+                ser.open()
+                if ser.is_open:
+                    self.cb_com.setEnabled(False)
+                    self.push_button_1.setText('断开连接')
+            except serial.SerialException as e:
+                print(f"操作串口时出现错误: {e}")
+            self.save_ini()
+            self.close()
+
 
     #@staticmethod
     def bt_save(self):
         print("保存配置")
+        self.save_ini()
         self.close()
 
     def center(self):
