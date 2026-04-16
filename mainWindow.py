@@ -2,6 +2,7 @@ import os
 import sys
 
 import PyQt5.QtCore as QtCore
+import serial
 from PyQt5.QtGui import QIcon
 
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QTextEdit, QMainWindow, QApplication, QAction, \
@@ -179,12 +180,36 @@ class MainWindow(QMainWindow):
         menu_set.addAction(file_set)
         menu_set.triggered[QAction].connect(self.set_function)
 
+    def uart_process_signal(self, cmd, param):
+        print('串口参数:',param)
+        ser = serial.Serial()  # 配置串口参数
+        ser.port = param['port']
+        ser.baudrate = param['baudrate']
+        ser.bytesize = param['bytesize']
+        ser.parity = param['parity']
+        ser.stopbits = param['stopbits']
+        ser.timeout = 1
+
+        print(f"串口: {ser.name}", ser.baudrate, ser.bytesize, ser.parity, ser.stopbits, ser.timeout)
+
+        if cmd == 'close':
+            print("串口已连接，关闭")
+            ser.close()
+        elif cmd == 'open':
+            try:
+                print("串口被打开")
+                ser.open()
+            except serial.SerialException as e:
+                print(f"操作串口时出现错误: {e}")
+
+
     def set_function(self, action):
         if action.triggered:
             print(action.text())
             if action.text() == '串口配置':
                 print("配置。。。")
                 self.ex = UartSetWidget()
+                self.ex.uart_process_signal.connect(self.uart_process_signal)
                 self.ex.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint)
                 self.ex.show()
             elif action.text() == '配置文件':

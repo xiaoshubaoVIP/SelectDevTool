@@ -14,6 +14,9 @@ import serial.tools.list_ports
 import configparser
 
 class UartSetWidget(QWidget):
+
+    uart_process_signal = pyqtSignal(str, dict)
+
     def __init__(self):
         super().__init__()
 
@@ -153,32 +156,26 @@ class UartSetWidget(QWidget):
 
     # @staticmethod
     def bt_connect(self):
-        ser = serial.Serial()  # 配置串口参数
-        ser.port = self.cb_com.currentText()
-        ser.baudrate = int(self.cb_baud.currentText())
-        ser.bytesize = self.dict_data.get(self.cb_data_bit.currentText(), 8)
-        ser.parity = self.dict_parity.get(self.cb_parity_bit.currentText(), 'N')
-        ser.stopbits = self.dict_stop.get(self.cb_stop_bit.currentText(), 1)
-        ser.timeout = 1  # 打开串口
+        dict_uart_param = {
+                            'port':self.cb_com.currentText(),
+                            'baudrate':int(self.cb_baud.currentText()),
+                            'bytesize':self.dict_data.get(self.cb_data_bit.currentText(), 8),
+                            'parity':self.dict_parity.get(self.cb_parity_bit.currentText(), 'N'),
+                            'stopbits':self.dict_stop.get(self.cb_stop_bit.currentText(), 1)
+                           }
 
-        print(f"串口: {ser.name}", ser.baudrate, ser.bytesize, ser.parity, ser.stopbits, ser.timeout)
-
-        if ser.is_open:
-            print("串口已连接，关闭")
-            ser.close()
-            self.push_button_1.setText('连接串口')
-            self.cb_com.setEnabled(True)
-        else:
-            try:
-                print("串口被打开")
-                ser.open()
-                if ser.is_open:
-                    self.cb_com.setEnabled(False)
-                    self.push_button_1.setText('断开连接')
-            except serial.SerialException as e:
-                print(f"操作串口时出现错误: {e}")
+        if self.push_button_1.text() == "连接串口":
+            print("串口未打开，open")
+            self.push_button_1.setText("断开连接")
+            self.cb_com.setEnabled(False)
+            self.uart_process_signal.emit('open',dict_uart_param)
             self.save_ini()
             self.close()
+        elif self.push_button_1.text() == "断开连接":
+            print("串口已打开，close")
+            self.push_button_1.setText("连接串口")
+            self.cb_com.setEnabled(True)
+            self.uart_process_signal.emit('close', dict_uart_param)
 
 
     #@staticmethod
