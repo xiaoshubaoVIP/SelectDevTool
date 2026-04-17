@@ -49,7 +49,7 @@ class SampleData(QWidget):
         self.push_button_open = QPushButton("打开串口")
         self.push_button_open.setStyleSheet("background-color: rgb(225,225,225); color: black;")
         self.push_button_open.setFixedSize(75, 25)
-        self.push_button_open.clicked.connect(self.open_close_uart)
+        self.push_button_open.clicked.connect(self.button_open_close_uart)
 
         #串口基本信息
         #port显示
@@ -135,8 +135,7 @@ class SampleData(QWidget):
         self.setLayout(stack_main_layout)
 
 
-    def open_close_uart(self):
-
+    def button_open_close_uart(self):
         dict_data = {'Data5':5, 'Data6':6, 'Data7':7, 'Data8':8}
         dict_stop = {'OneStop':1, 'OneAndHalfStop':1.5, 'TwoStop':2}
         dict_parity = {'NoParity':'N', 'EvenParity':'E', 'OddParity':'O', 'SpaceParity':'S', 'MarkParity':'M'}
@@ -148,19 +147,31 @@ class SampleData(QWidget):
                             'stopbits':dict_stop.get(self.conf['uart']['stop'], 1)
                            }
         if  self.push_button_open.text() == '打开串口':
-            self.uart_open_or_close('open',dict_uart_set_param)
+            self.open_or_close_serial('open',dict_uart_set_param)
         elif self.push_button_open.text() == '关闭串口':
-            self.uart_open_or_close('close',dict_uart_set_param)
+            self.open_or_close_serial('close',dict_uart_set_param)
 
     def set_uart_function(self):
         self.set_uart_form = UartSetWidget()
-        self.set_uart_form.uart_process_signal.connect(self.uart_open_or_close)
+        self.set_uart_form.uart_process_signal.connect(self.open_or_close_serial)
         self.set_uart_form.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint)
         self.set_uart_form.show()
 
     # @staticmethod
-    def uart_open_or_close(self, cmd, param):
+    def open_or_close_serial(self, cmd, param):
         print('串口:',cmd, param)
+        try:
+            port_index = self.list_port.index(str(param['port']))
+        except ValueError as e:
+            port_index = 0
+        self.combox_uart_port.setCurrentIndex(port_index)
+        try:
+            baud_index = self.list_baud.index(str(param['baudrate']))
+        except ValueError as e:
+            baud_index = 0
+        self.combox_uart_baud.setCurrentIndex(baud_index)
+        # self.combox_uart_port.setText(str(param['port']))
+        # self.combox_uart_baud.setText(str(param['baudrate']))
         if cmd == 'open':
             if not self.serial_thread or not self.serial_thread.isRunning():
                 self.serial_thread = SerialThread(param, 'hex' if self.radio_button_hex.isChecked() else 'ascii')
@@ -174,6 +185,8 @@ class SampleData(QWidget):
             self.combox_uart_baud.setEnabled(True)
             self.radio_button_ascii.setEnabled(True)
             self.radio_button_hex.setEnabled(True)
+            self.push_button_set.setEnabled(True)
+            self.push_button_set.setStyleSheet("background-color: rgb(225,225,225); color: black;")
             self.text_edit.append(self.warning.format(f"串口:{self.combox_uart_port.currentText()}已关闭⚠️"))
 
     def serial_thread_error_process(self, result_msg):
@@ -184,6 +197,8 @@ class SampleData(QWidget):
             self.combox_uart_baud.setEnabled(False)
             self.radio_button_ascii.setEnabled(False)
             self.radio_button_hex.setEnabled(False)
+            self.push_button_set.setEnabled(False)
+            self.push_button_set.setStyleSheet("background-color: rgb(225,225,225); color: gray;")
             self.text_edit.append(self.valid.format(f"串口:{self.combox_uart_port.currentText()}已打开✅"))
         elif result_msg == '打开串口失败':
             self.text_edit.append(self.error.format(f"串口:{self.combox_uart_port.currentText()}打开❌"))

@@ -55,10 +55,12 @@ class UartSetWidget(QWidget):
         self.cb_baud = QComboBox()
         self.cb_baud.setFixedSize(200, 30)
         self.cb_baud.setStyleSheet("QComboBox { background-color: white; }")
+        self.cb_baud.addItems(self.list_baud)
         try:
             baud_index = self.list_baud.index(conf['uart']['bound'])
         except ValueError as e:
             baud_index = 0
+
         self.cb_baud.setCurrentIndex(baud_index)
 
         self.cb_data_bit = QComboBox()
@@ -146,8 +148,6 @@ class UartSetWidget(QWidget):
         self.setGeometry(300, 100, 360, 240)
         self.center()
 
-        self.bt_connect()
-
     def save_ini(self):
         config = configparser.ConfigParser()  # 需要实例化一个ConfigParser对象
         if Path(self.ini_path).is_file():
@@ -170,19 +170,9 @@ class UartSetWidget(QWidget):
                             'parity':self.dict_parity.get(self.cb_parity_bit.currentText(), 'N'),
                             'stopbits':self.dict_stop.get(self.cb_stop_bit.currentText(), 1)
                            }
-
-        if self.push_button_1.text() == "连接串口":
-            print("串口未打开，open")
-            self.push_button_1.setText("断开连接")
-            self.cb_com.setEnabled(False)
-            self.uart_process_signal.emit('open',dict_uart_set_param)
-            self.save_ini()
-            self.close()
-        elif self.push_button_1.text() == "断开连接":
-            print("串口已打开，close")
-            self.push_button_1.setText("连接串口")
-            self.cb_com.setEnabled(True)
-            self.uart_process_signal.emit('close', dict_uart_set_param)
+        self.uart_process_signal.emit('open',dict_uart_set_param)
+        self.save_ini()
+        self.close()
 
 
     #@staticmethod
