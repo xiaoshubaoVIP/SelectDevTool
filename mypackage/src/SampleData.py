@@ -10,10 +10,11 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import QDir, ws, Qt
 from PyQt5.QtGui import QPen, QBrush, QColor
 from PyQt5.QtWidgets import QWidget, QPushButton, QLineEdit, QTextEdit, QVBoxLayout, QHBoxLayout, QFileDialog, \
-    QComboBox, QLabel, QGridLayout, QSplitter
+    QComboBox, QLabel, QGridLayout, QSplitter, QRadioButton
 
 from QCustomPlot_PyQt5 import QCustomPlot
 
+from mypackage.src.SerialThread import SerialThread
 from mypackage.src.UartSetWidget import UartSetWidget
 
 
@@ -39,7 +40,7 @@ class SampleData(QWidget):
         print(self.list_port)
         #串口对象
         self.set_uart_form = None
-        self.ser = None
+        self.serial_thread = None
 
         #设置文件
         self.set_file_path = None
@@ -84,6 +85,11 @@ class SampleData(QWidget):
         self.push_button_save.setFixedSize(75, 25)
         self.push_button_save.clicked.connect(self.show_save_dialog)
 
+        #ascii或hex
+        self.radio_button_ascii = QRadioButton('ascii')
+        self.radio_button_ascii.setChecked(True)
+        self.radio_button_hex = QRadioButton('hex')
+
         #实例化textEdit并加入布局
         self.text_edit = QTextEdit()
         self.text_edit.setStyleSheet("QTextEdit { background-color: white; }")
@@ -110,6 +116,8 @@ class SampleData(QWidget):
         stack_layout_1.addWidget(self.push_button_open)
         stack_layout_1.addWidget(self.combox_uart_port)
         stack_layout_1.addWidget(self.combox_uart_baud)
+        stack_layout_1.addWidget(self.radio_button_ascii)
+        stack_layout_1.addWidget(self.radio_button_hex)
         stack_layout_1.addWidget(self.push_button_set)
         stack_layout_1.addWidget(self.push_button_save)
         stack_layout_1.setAlignment(QtCore.Qt.AlignLeft)
@@ -152,39 +160,31 @@ class SampleData(QWidget):
 
     # @staticmethod
     def uart_open_or_close(self, cmd, param):
-        print('串口参数:',param)
-        self.ser = serial.Serial()  # 配置串口参数
-        self.ser.port = param['port']
-        self.ser.baudrate = param['baudrate']
-        self.ser.bytesize = param['bytesize']
-        self.ser.parity = param['parity']
-        self.ser.stopbits = param['stopbits']
-        self.ser.timeout = 1
-
-        print(f"串口: {self.ser.name}", self.ser.baudrate, self.ser.bytesize, self.ser.parity, self.ser.stopbits, self.ser.timeout)
-
-        if cmd == 'close':
-            print("串口已连接，关闭")
-            self.ser.close()
+        print('串口:',cmd, param)
+        if cmd == 'open':
+            if not self.serial_thread or not self.serial_thread.isRunning():
+                self.serial_thread = SerialThread(param, 'hex' if self.radio_button_hex.isChecked() else 'ascii')
+                self.serial_thread.serial_error.connect(self.serial_thread_error_process)
+                self.serial_thread.start()
+        elif cmd == 'close':
+            self.serial_thread.stop()
             self.push_button_open.setText('打开串口')
             self.combox_uart_port.setEnabled(True)
             self.combox_uart_baud.setEnabled(True)
-            self.text_edit.append(self.warning.format(f"串口:{self.ser.name}关闭⚠️"))
-        elif cmd == 'open':
-            try:
-                print("串口被打开")
-                self.ser.open()
-                self.push_button_open.setText('关闭串口')
-                self.combox_uart_port.setEnabled(False)
-                self.combox_uart_baud.setEnabled(False)
-                self.text_edit.append(self.valid.format(f"串口:{self.ser.name}打开✅"))
-            except serial.SerialException as e:
-                print(f"操作串口时出现错误: {e}")
-                self.ser.close()
-                self.push_button_open.setText('打开串口')
-                self.combox_uart_port.setEnabled(True)
-                self.combox_uart_baud.setEnabled(True)
-                self.text_edit.append(self.error.format(f"串口:{self.ser.name}打开❌"))
+            self.text_edit.append(self.warning.format(f"串口:{self.combox_uart_port.currentText()}已关闭⚠️"))
+
+    def serial_thread_error_process(self, result_msg):
+        print('msg:', result_msg)
+        if result_msg == '打开串口成功':
+            self.push_button_open.setText('关闭串口')
+            self.combox_uart_port.setEnabled(False)
+            self.combox_uart_baud.setEnabled(False)
+            self.text_edit.append(self.valid.format(f"串口:{self.combox_uart_port.currentText()}已打开✅"))
+        elif result_msg == '打开串口失败':
+            self.text_edit.append(self.error.format(f"串口:{self.combox_uart_port.currentText()}打开❌"))
+        else:
+            self.text_edit.append(self.warning.format(f"串口:{result_msg}⚠️"))
+
 
     def get_dir(self):
         dialog = QFileDialog()
