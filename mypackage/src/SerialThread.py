@@ -1,5 +1,6 @@
 from PyQt5.QtCore import QThread,pyqtSignal
 import serial
+from requests.compat import chardet
 
 
 class SerialThread(QThread):
@@ -76,7 +77,9 @@ class SerialThread(QThread):
             # ascii显示
             if self.__date_format == 'ascii':
                 # 串口接收到的字符串为b'ABC',要转化成unicode字符串才能输出到窗口中去
-                data_str = byte_array.decode('utf-8')
+                # result = chardet.detect(byte_array)
+                # detected_encoding = result['encoding']
+                data_str = byte_array.decode(encoding='utf-8', errors='ignore')
             else:
                 # 串口接收到的字符串为b'ZZ\x02\x03Z'，要转换成16进制字符串显示
                 data_str = ' '.join(format(x, '02x') for x in byte_array)

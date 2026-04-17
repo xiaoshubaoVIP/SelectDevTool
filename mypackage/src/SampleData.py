@@ -165,12 +165,15 @@ class SampleData(QWidget):
             if not self.serial_thread or not self.serial_thread.isRunning():
                 self.serial_thread = SerialThread(param, 'hex' if self.radio_button_hex.isChecked() else 'ascii')
                 self.serial_thread.serial_error.connect(self.serial_thread_error_process)
+                self.serial_thread.data_received.connect(self.serial_thread_receive_data_process)
                 self.serial_thread.start()
         elif cmd == 'close':
             self.serial_thread.stop()
             self.push_button_open.setText('打开串口')
             self.combox_uart_port.setEnabled(True)
             self.combox_uart_baud.setEnabled(True)
+            self.radio_button_ascii.setEnabled(True)
+            self.radio_button_hex.setEnabled(True)
             self.text_edit.append(self.warning.format(f"串口:{self.combox_uart_port.currentText()}已关闭⚠️"))
 
     def serial_thread_error_process(self, result_msg):
@@ -179,12 +182,17 @@ class SampleData(QWidget):
             self.push_button_open.setText('关闭串口')
             self.combox_uart_port.setEnabled(False)
             self.combox_uart_baud.setEnabled(False)
+            self.radio_button_ascii.setEnabled(False)
+            self.radio_button_hex.setEnabled(False)
             self.text_edit.append(self.valid.format(f"串口:{self.combox_uart_port.currentText()}已打开✅"))
         elif result_msg == '打开串口失败':
             self.text_edit.append(self.error.format(f"串口:{self.combox_uart_port.currentText()}打开❌"))
         else:
             self.text_edit.append(self.warning.format(f"串口:{result_msg}⚠️"))
 
+    def serial_thread_receive_data_process(self, receive_data):
+        print('receive:', receive_data)
+        self.text_edit.append(receive_data)
 
     def get_dir(self):
         dialog = QFileDialog()
