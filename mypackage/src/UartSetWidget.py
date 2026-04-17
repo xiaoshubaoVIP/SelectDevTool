@@ -46,13 +46,20 @@ class UartSetWidget(QWidget):
         self.cb_com.setFixedSize(200, 30)
         self.cb_com.setStyleSheet("QComboBox { background-color: white; }")
         self.cb_com.addItems(self.list_port)
-        self.cb_com.setCurrentIndex(self.list_port.index(conf['uart']['port']))
+        try:
+            port_index = self.list_port.index(conf['uart']['port'])
+        except ValueError as e:
+            port_index = 0
+        self.cb_com.setCurrentIndex(port_index)
 
         self.cb_baud = QComboBox()
         self.cb_baud.setFixedSize(200, 30)
         self.cb_baud.setStyleSheet("QComboBox { background-color: white; }")
-        self.cb_baud.addItems(self.list_baud)
-        self.cb_baud.setCurrentIndex(self.list_baud.index(conf['uart']['bound']))
+        try:
+            baud_index = self.list_baud.index(conf['uart']['bound'])
+        except ValueError as e:
+            baud_index = 0
+        self.cb_baud.setCurrentIndex(baud_index)
 
         self.cb_data_bit = QComboBox()
         self.cb_data_bit.setFixedSize(200, 30)
@@ -156,7 +163,7 @@ class UartSetWidget(QWidget):
 
     # @staticmethod
     def bt_connect(self):
-        dict_uart_param = {
+        dict_uart_set_param = {
                             'port':self.cb_com.currentText(),
                             'baudrate':int(self.cb_baud.currentText()),
                             'bytesize':self.dict_data.get(self.cb_data_bit.currentText(), 8),
@@ -168,14 +175,14 @@ class UartSetWidget(QWidget):
             print("串口未打开，open")
             self.push_button_1.setText("断开连接")
             self.cb_com.setEnabled(False)
-            self.uart_process_signal.emit('open',dict_uart_param)
+            self.uart_process_signal.emit('open',dict_uart_set_param)
             self.save_ini()
             self.close()
         elif self.push_button_1.text() == "断开连接":
             print("串口已打开，close")
             self.push_button_1.setText("连接串口")
             self.cb_com.setEnabled(True)
-            self.uart_process_signal.emit('close', dict_uart_param)
+            self.uart_process_signal.emit('close', dict_uart_set_param)
 
 
     #@staticmethod

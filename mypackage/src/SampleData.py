@@ -1,7 +1,11 @@
+import configparser
 import os
 import time
+from pathlib import Path
 
 import serial
+import serial.tools.list_ports
+
 from PyQt5 import QtCore
 from PyQt5.QtCore import QDir, ws, Qt
 from PyQt5.QtGui import QPen, QBrush, QColor
@@ -20,6 +24,19 @@ class SampleData(QWidget):
         self.warning = '<font color="orange">{}</font>'
         self.valid = '<font color="green">{}</font>'
 
+        # list_ports.comports()函数来获取可用的串口端口
+        self.ports = serial.tools.list_ports.comports()
+        self.list_port = []
+        for port in sorted(self.ports):
+            self.list_port.append(port.name)
+        self.list_baud = ['4800', '9600', '19200', '115200']
+        #读取ini配置文件
+        self.ini_path = QtCore.QDir.currentPath() + '/setting/' + 'setting.ini'
+        self.conf = configparser.ConfigParser()  # 需要实例化一个ConfigParser对象
+        if Path(self.ini_path).is_file():
+            self.conf.read(self.ini_path, encoding='utf-8')
+
+        print(self.list_port)
         #串口对象
         self.set_uart_form = None
         self.ser = None
@@ -30,27 +47,41 @@ class SampleData(QWidget):
         #实例化按键
         self.push_button_open = QPushButton("打开串口")
         self.push_button_open.setStyleSheet("background-color: rgb(225,225,225); color: black;")
-        self.push_button_open.setFixedSize(60, 25)
+        self.push_button_open.setFixedSize(75, 25)
         self.push_button_open.clicked.connect(self.open_close_uart)
 
         #串口基本信息
-        self.label_uart_port = QLabel(str('COM3'))
-        self.label_uart_port.setFixedSize(40, 25)
-        self.label_uart_port.setStyleSheet("QLabel { background-color: white; }")
-        self.label_uart_baud = QLabel(str('9600'))
-        self.label_uart_baud.setFixedSize(40, 25)
-        self.label_uart_baud.setStyleSheet("QLabel { background-color: white; }")
+        #port显示
+        self.combox_uart_port = QComboBox()
+        self.combox_uart_port.setFixedSize(100, 25)
+        self.combox_uart_port.setStyleSheet("QComboBox { background-color: white; }")
+        self.combox_uart_port.addItems(self.list_port)
+        try:
+            port_index = self.list_port.index(self.conf['uart']['port'])
+        except ValueError as e:
+            port_index = 0
+        self.combox_uart_port.setCurrentIndex(port_index)
+        #baud显示
+        self.combox_uart_baud = QComboBox()
+        self.combox_uart_baud.setFixedSize(100, 25)
+        self.combox_uart_baud.setStyleSheet("QComboBox { background-color: white; }")
+        self.combox_uart_baud.addItems(self.list_baud)
+        try:
+            baud_index = self.list_baud.index(self.conf['uart']['bound'])
+        except ValueError as e:
+            baud_index = 0
+        self.combox_uart_baud.setCurrentIndex(baud_index)
 
         #设置串口
         self.push_button_set = QPushButton('设置串口')
         self.push_button_set.setStyleSheet("background-color: rgb(225,225,225); color: black;")
-        self.push_button_set.setFixedSize(100, 25)
+        self.push_button_set.setFixedSize(75, 25)
         self.push_button_set.clicked.connect(self.set_uart_function)
 
         #保存日志
         self.push_button_save = QPushButton('保存日志')
         self.push_button_save.setStyleSheet("background-color: rgb(225,225,225); color: black;")
-        self.push_button_save.setFixedSize(100, 25)
+        self.push_button_save.setFixedSize(75, 25)
         self.push_button_save.clicked.connect(self.show_save_dialog)
 
         #实例化textEdit并加入布局
@@ -68,7 +99,6 @@ class SampleData(QWidget):
         self.customPlot.addGraph()
         self.customPlot.graph(1).setPen(QPen(Qt.red))  # line color red for second graph
 
-
         #布局
         stack_main_layout = QVBoxLayout()
         stack_layout_1 = QHBoxLayout()
@@ -78,8 +108,8 @@ class SampleData(QWidget):
 
         #并加入布局
         stack_layout_1.addWidget(self.push_button_open)
-        stack_layout_1.addWidget(self.label_uart_port)
-        stack_layout_1.addWidget(self.label_uart_baud)
+        stack_layout_1.addWidget(self.combox_uart_port)
+        stack_layout_1.addWidget(self.combox_uart_baud)
         stack_layout_1.addWidget(self.push_button_set)
         stack_layout_1.addWidget(self.push_button_save)
         stack_layout_1.setAlignment(QtCore.Qt.AlignLeft)
@@ -96,19 +126,32 @@ class SampleData(QWidget):
         stack_main_layout.addLayout(stack_layout_2)
         self.setLayout(stack_main_layout)
 
-    @staticmethod
+
     def open_close_uart(self):
-        # self.set_uart_form = UartSetWidget()
-        print("open and close")
+
+        dict_data = {'Data5':5, 'Data6':6, 'Data7':7, 'Data8':8}
+        dict_stop = {'OneStop':1, 'OneAndHalfStop':1.5, 'TwoStop':2}
+        dict_parity = {'NoParity':'N', 'EvenParity':'E', 'OddParity':'O', 'SpaceParity':'S', 'MarkParity':'M'}
+        dict_uart_set_param = {
+                            'port':self.combox_uart_port.currentText(),
+                            'baudrate':int(self.combox_uart_baud.currentText()),
+                            'bytesize':dict_data.get(self.conf['uart']['data'], 8),
+                            'parity':dict_parity.get(self.conf['uart']['parity'], 'N'),
+                            'stopbits':dict_stop.get(self.conf['uart']['stop'], 1)
+                           }
+        if  self.push_button_open.text() == '打开串口':
+            self.uart_open_or_close('open',dict_uart_set_param)
+        elif self.push_button_open.text() == '关闭串口':
+            self.uart_open_or_close('close',dict_uart_set_param)
 
     def set_uart_function(self):
         self.set_uart_form = UartSetWidget()
-        self.set_uart_form.uart_process_signal.connect(self.uart_process_signal)
+        self.set_uart_form.uart_process_signal.connect(self.uart_open_or_close)
         self.set_uart_form.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint)
         self.set_uart_form.show()
 
     # @staticmethod
-    def uart_process_signal(self, cmd, param):
+    def uart_open_or_close(self, cmd, param):
         print('串口参数:',param)
         self.ser = serial.Serial()  # 配置串口参数
         self.ser.port = param['port']
@@ -123,12 +166,25 @@ class SampleData(QWidget):
         if cmd == 'close':
             print("串口已连接，关闭")
             self.ser.close()
+            self.push_button_open.setText('打开串口')
+            self.combox_uart_port.setEnabled(True)
+            self.combox_uart_baud.setEnabled(True)
+            self.text_edit.append(self.warning.format(f"串口:{self.ser.name}关闭⚠️"))
         elif cmd == 'open':
             try:
                 print("串口被打开")
                 self.ser.open()
+                self.push_button_open.setText('关闭串口')
+                self.combox_uart_port.setEnabled(False)
+                self.combox_uart_baud.setEnabled(False)
+                self.text_edit.append(self.valid.format(f"串口:{self.ser.name}打开✅"))
             except serial.SerialException as e:
                 print(f"操作串口时出现错误: {e}")
+                self.ser.close()
+                self.push_button_open.setText('打开串口')
+                self.combox_uart_port.setEnabled(True)
+                self.combox_uart_baud.setEnabled(True)
+                self.text_edit.append(self.error.format(f"串口:{self.ser.name}打开❌"))
 
     def get_dir(self):
         dialog = QFileDialog()
