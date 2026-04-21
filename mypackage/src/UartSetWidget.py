@@ -36,7 +36,7 @@ class UartSetWidget(QWidget):
 
 
         #读取ini配置文件
-        self.ini_path = QtCore.QDir.currentPath() + '/setting/' + 'setting.ini'
+        self.ini_path = QtCore.QDir.currentPath() + '/setting/' + 'uart.ini'
         conf = configparser.ConfigParser()  # 需要实例化一个ConfigParser对象
         if Path(self.ini_path).is_file():
             conf.read(self.ini_path, encoding='utf-8')

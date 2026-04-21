@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import QWidget, QPushButton, QLineEdit, QTextEdit, QVBoxLay
 from QCustomPlot_PyQt5 import QCustomPlot
 
 from mypackage.src.SerialThread import SerialThread
+from mypackage.src.TableSet import TableSet
 from mypackage.src.UartSetWidget import UartSetWidget
 
 
@@ -32,7 +33,7 @@ class SampleData(QWidget):
             self.list_port.append(port.name)
         self.list_baud = ['4800', '9600', '19200', '115200']
         #读取ini配置文件
-        self.ini_path = QtCore.QDir.currentPath() + '/setting/' + 'setting.ini'
+        self.ini_path = QtCore.QDir.currentPath() + '/setting/' + 'uart.ini'
         self.conf = configparser.ConfigParser()  # 需要实例化一个ConfigParser对象
         if Path(self.ini_path).is_file():
             self.conf.read(self.ini_path, encoding='utf-8')
@@ -90,11 +91,14 @@ class SampleData(QWidget):
         self.radio_button_ascii.setChecked(True)
         self.radio_button_hex = QRadioButton('hex')
 
+        #实例化tableWidget
+        self.table = TableSet()
+
         #实例化textEdit并加入布局
         self.text_edit = QTextEdit()
         self.text_edit.setStyleSheet("QTextEdit { background-color: white; }")
 
-
+        #
         self.customPlot = QCustomPlot(self)
         # self.gridLayout = QGridLayout(self).addWidget(self.customPlot)
         # add two new graphs and set their look:
@@ -111,6 +115,9 @@ class SampleData(QWidget):
         stack_layout_2 = QHBoxLayout()
         # 1. 创建一个水平方向的 QSplitter
         splitter = QSplitter(Qt.Horizontal)
+        splitter_1 = QSplitter(Qt.Vertical)
+        splitter.setStyleSheet("QSplitter { background-color: white; }")
+        splitter_1.setStyleSheet("QSplitter { background-color: white; }")
 
         #并加入布局
         stack_layout_1.addWidget(self.push_button_open)
@@ -122,7 +129,11 @@ class SampleData(QWidget):
         stack_layout_1.addWidget(self.push_button_save)
         stack_layout_1.setAlignment(QtCore.Qt.AlignLeft)
 
-        splitter.addWidget(self.text_edit)
+        splitter_1.addWidget(self.table)
+        splitter_1.addWidget(self.text_edit)
+        splitter_1.setSizes([1000, 1000])
+
+        splitter.addWidget(splitter_1)
         splitter.addWidget(self.customPlot)
 
         #设置初始大小比例，例如 1:1
