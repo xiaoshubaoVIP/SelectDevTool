@@ -6,6 +6,31 @@ from PyQt5.QtWidgets import QWidget, QStackedWidget, QApplication, QPushButton, 
     QFormLayout, QGroupBox, QLineEdit, QSpacerItem, QSizePolicy, QMessageBox, QComboBox, QColorDialog
 
 
+# 1. 自定义 QLineEdit 类
+class ClickableLineEdit(QLineEdit):
+    colorSignal = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # 可以在这里初始化一些变量
+
+    # 2. 重写鼠标按下事件
+    def mousePressEvent(self, event):
+        # 3. 判断是否是鼠标左键
+        if event.button() == Qt.LeftButton:
+            c = QColorDialog.getColor()
+            if c.isValid():
+                self.colorSignal.emit(c.name())
+                print(c.name())
+            print("触发了！鼠标左键点击了输入框")
+            # 在这里执行你想要的逻辑
+            # self.clear()  # 例如：点击即清空
+
+        # 4. 【重要】调用父类的 mousePressEvent
+        # 如果不加这一行，光标将无法定位，右键菜单也会失效
+        super().mousePressEvent(event)
+
+
 class addFunction(QWidget):
     addSignal = pyqtSignal(dict)
 
@@ -33,10 +58,10 @@ class addFunction(QWidget):
         self.integer_combox = QComboBox()
         self.integer_combox.addItems(['signed', 'unsigned'])
         self.colour = QLabel("颜色")
-        self.colour_line_edit = QLineEdit()
+        # self.colour_line_edit = QLineEdit()
+        self.colour_line_edit = ClickableLineEdit(self)
         self.colour_line_edit.setStyleSheet("background-color: black;")
-        self.colour_line_edit.textEdited.connect(self.select_color)
-
+        self.colour_line_edit.colorSignal.connect(self.set_colour)
 
         self.push_button_1 = QPushButton('确认',self)
         self.push_button_1.setStyleSheet("background-color: rgb(255,255,255); color: black;")
@@ -57,10 +82,10 @@ class addFunction(QWidget):
         from_layout.addRow(self.push_button_1, self.push_button_2)
         self.setLayout(from_layout)
 
-    @staticmethod
-    def select_color(self):
-        c = QColorDialog.getColor()
-        print(c.name())
+
+    def set_colour(self, color):
+        self.colour_line_edit.setText(str(color))
+        self.colour_line_edit.setStyleSheet(f"background-color: {color}")
 
     def bt1_confirm(self):
         set_data = {
