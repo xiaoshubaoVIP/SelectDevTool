@@ -3,7 +3,7 @@ import sys
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import QWidget, QStackedWidget, QApplication, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, \
-    QFormLayout, QGroupBox, QLineEdit, QSpacerItem, QSizePolicy, QMessageBox, QComboBox
+    QFormLayout, QGroupBox, QLineEdit, QSpacerItem, QSizePolicy, QMessageBox, QComboBox, QColorDialog
 
 
 class addFunction(QWidget):
@@ -35,6 +35,7 @@ class addFunction(QWidget):
         self.colour = QLabel("颜色")
         self.colour_line_edit = QLineEdit()
         self.colour_line_edit.setStyleSheet("background-color: black;")
+        self.colour_line_edit.textEdited.connect(self.select_color)
 
 
         self.push_button_1 = QPushButton('确认',self)
@@ -56,6 +57,10 @@ class addFunction(QWidget):
         from_layout.addRow(self.push_button_1, self.push_button_2)
         self.setLayout(from_layout)
 
+    @staticmethod
+    def select_color(self):
+        c = QColorDialog.getColor()
+        print(c.name())
 
     def bt1_confirm(self):
         set_data = {

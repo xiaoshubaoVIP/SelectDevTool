@@ -189,24 +189,26 @@ class TableSet(QWidget):
     def delete_function(self):
         print('删除事件')
         cur_row = self.tableWidget.currentRow()
-        code = self.tableWidget.item(cur_row, 0)
-        if code:
-            section_name = code.text()
-            reply = QMessageBox.question(self, '删除', f'确定删除{section_name}的信息?',
-                                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if reply == QMessageBox.Yes:
-                self.tableWidget.removeRow(cur_row)
+        item = self.tableWidget.cellWidget(cur_row, 0)
+        if item is not None:
+            target_label = item.findChild(QtWidgets.QLabel)
+            if target_label is not None:
+                section_name = target_label.text()
+                reply = QMessageBox.question(self, '删除', f'确定删除{section_name}的信息?',
+                                            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    self.tableWidget.removeRow(cur_row)
 
-                config = configparser.ConfigParser()
-                try:
-                    config.read(self.table_ini_path, encoding='utf-8')
-                except Exception as e:
-                    QMessageBox.critical(self, "错误", f"读取文件失败: {str(e)}")
-                    return
-                config.remove_section(section_name)  # 删除
-                # 写入文件
-                with open(self.table_ini_path, 'w', encoding='utf-8') as configfile:
-                    config.write(configfile)
+                    config = configparser.ConfigParser()
+                    try:
+                        config.read(self.table_ini_path, encoding='utf-8')
+                    except Exception as e:
+                        QMessageBox.critical(self, "错误", f"读取文件失败: {str(e)}")
+                        return
+                    config.remove_section(section_name)  # 删除
+                    # 写入文件
+                    with open(self.table_ini_path, 'w', encoding='utf-8') as configfile:
+                        config.write(configfile)
 
     #添加和编辑处理函数
     def add_edit_function(self, res):
@@ -215,7 +217,26 @@ class TableSet(QWidget):
         section = str(res['名称'])
         row_count = self.tableWidget.rowCount()
         self.tableWidget.insertRow(row_count)
-        self.tableWidget.setItem(row_count, 0, QTableWidgetItem(section))
+
+        # 控件居中方法：
+        checkbox = QCheckBox()  # 定义checkbox控件
+        checkbox.setChecked(True)  # 默认全部勾选
+
+        name_label = QLabel(str(section))  # 定义QLabelx控件
+
+        # 1.实例化一个新布局
+        item_layout = QtWidgets.QHBoxLayout()
+        # 2.在布局里添加checkBox
+        item_layout.addWidget(checkbox)
+        item_layout.addWidget(name_label)
+        # 3.在布局里居中放置checkBox并设置水平居中
+        item_layout.setAlignment(Qt.AlignLeft)
+        # 4.实例化一个QWidget（控件）
+        widget = QtWidgets.QWidget()
+        # 5.在QWidget放置布局
+        widget.setLayout(item_layout)
+
+        self.tableWidget.setCellWidget(row_count, 0, widget)
 
         config = configparser.ConfigParser()
         try:
