@@ -27,12 +27,9 @@ class TableSet(QWidget):
         self.add_action = QAction("添加", self)
         self.edit_action = QAction("编辑", self)
         self.delete_action = QAction("删除", self)
-        # self.set_action = QAction("设置规则", self)
-
         self.add_action.triggered.connect(self.add_function)
         self.edit_action.triggered.connect(self.edit_function)
         self.delete_action.triggered.connect(self.delete_function)
-        # self.set_action.triggered.connect(self.set_function)
 
         # 获取当前目录的上一级
         temp_path = QDir.currentPath()
@@ -135,9 +132,7 @@ class TableSet(QWidget):
         self.tableWidget.resizeColumnsToContents()
 
     def show_context_menu(self, pos):
-        print('右击')
         select_row = self.tableWidget.currentRow()
-        print(select_row)
 
 
         # 转换坐标系
@@ -145,16 +140,22 @@ class TableSet(QWidget):
         for i in self.tableWidget.selectionModel().selection().indexes():
             row_num = i.row()
 
+        print('右击', select_row, row_num)
+
         if row_num == select_row:
-            print('行号:')
-            print(row_num)
+            print('行号:', row_num)
             menu = QMenu(self)
             menu.addAction(self.add_action)
             menu.addAction(self.edit_action)
             menu.addAction(self.delete_action)
             print(QCursor.pos())
             menu.exec_(QCursor.pos())
-            print('右击事件')
+        else:
+            print("sss")
+            menu = QMenu(self)
+            menu.addAction(self.add_action)
+            print(QCursor.pos())
+            menu.exec_(QCursor.pos())
 
 
     #添加
@@ -175,11 +176,24 @@ class TableSet(QWidget):
         cur_row = self.tableWidget.currentRow()
         code = self.tableWidget.item(cur_row, 0)
         if code:
-            reply = QMessageBox.question(self, '删除', '确定删除('+code.text()+')的信息?',
+            section_name = code.text()
+            reply = QMessageBox.question(self, '删除', f'确定删除{section_name}的信息?',
                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
                 self.tableWidget.removeRow(cur_row)
 
+                config = configparser.ConfigParser()
+                try:
+                    config.read(self.table_ini_path, encoding='utf-8')
+                except Exception as e:
+                    QMessageBox.critical(self, "错误", f"读取文件失败: {str(e)}")
+                    return
+                config.remove_section(section_name)  # 删除
+                # 写入文件
+                with open(self.table_ini_path, 'w', encoding='utf-8') as configfile:
+                    config.write(configfile)
+
+    #添加和编辑处理函数
     def add_edit_function(self, res):
         print('添加/编辑:', res)
 
@@ -203,7 +217,7 @@ class TableSet(QWidget):
         config.set(section, '颜色', res['颜色'])
 
         # 写入文件
-        with open(self.table_ini_path, 'w') as configfile:
+        with open(self.table_ini_path, 'w', encoding='utf-8') as configfile:
             config.write(configfile)
 
 
