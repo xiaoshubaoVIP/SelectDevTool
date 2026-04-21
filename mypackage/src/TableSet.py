@@ -13,16 +13,17 @@ from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import *
 from pandas.core.interchange.dataframe_protocol import DataFrame
 
+from mypackage.src.TableAddEdit import addFunction
+
 
 class TableSet(QWidget):
     def __init__(self):
         super().__init__()
         #super(TableWidget, self).__init__(parent)
 
-        self.stock_data = None
-        self.list_code = []
         self.tableWidget = None
-        self.add_class = None
+        self.add_or_edit = None
+
         self.add_action = QAction("添加", self)
         self.edit_action = QAction("编辑", self)
         self.delete_action = QAction("删除", self)
@@ -41,6 +42,7 @@ class TableSet(QWidget):
             if not os.path.isdir(self.path):
                 os.mkdir(self.path)
 
+        self.table_ini_path = QtCore.QDir.currentPath() + '/setting/' + 'table.ini'
         self.init_ui()
 
     def init_ui(self):
@@ -63,19 +65,18 @@ class TableSet(QWidget):
         self.customContextMenuRequested.connect(self.show_context_menu)
 
         # 加载数据
-        table_ini_path = QtCore.QDir.currentPath() + '/setting/' + 'table.ini'
-        self.load_ini_to_table(table_ini_path)
+        self.load_ini_to_table()
 
-    def load_ini_to_table(self, file_path):
+    def load_ini_to_table(self):
         # 1. 检查文件是否存在
-        if not os.path.exists(file_path):
-            QMessageBox.warning(self, "错误", f"找不到文件: {file_path}")
+        if not os.path.exists(self.table_ini_path):
+            QMessageBox.warning(self, "错误", f"找不到文件: {self.table_ini_path}")
             return
 
         # 2. 初始化 ConfigParser 并读取文件
         config = configparser.ConfigParser()
         try:
-            config.read(file_path, encoding='utf-8')
+            config.read(self.table_ini_path, encoding='utf-8')
         except Exception as e:
             QMessageBox.critical(self, "错误", f"读取文件失败: {str(e)}")
             return
@@ -133,31 +134,6 @@ class TableSet(QWidget):
         # 5. 自动调整列宽
         self.tableWidget.resizeColumnsToContents()
 
-    def set_table_widget_contents_center(self, remove_flag):
-        data = []
-        for row in range(self.tableWidget.rowCount()):
-            row_data = []
-            for col in range(self.tableWidget.columnCount()):
-                self.tableWidget.resizeColumnsToContents()
-                item = self.tableWidget.item(row,col)
-                if item:#需要加入判断，否则空item会导致死机
-                    # print(row,col,item.text())
-                    item.setTextAlignment(Qt.AlignCenter)
-                    row_data.append(item.text())
-                else:
-                    row_data.append(None)
-            data.append(row_data)
-
-        if remove_flag:
-            if data[0][0] == '示例模板':
-                self.tableWidget.removeRow(0)
-                del data[0]
-        self.list_code = data
-        # self.stock_data = GetStockDataCycle(self.list_code, cycle_flag=True, frequency=1000)
-        # self.stock_data.FreshSignal.connect(self.fresh_stock_data)
-        return data
-
-
     def show_context_menu(self, pos):
         print('右击')
         select_row = self.tableWidget.currentRow()
@@ -182,19 +158,53 @@ class TableSet(QWidget):
 
 
     #添加
-    @staticmethod
     def add_function(self):
         print('添加事件')
+        self.add_or_edit = addFunction(add_or_edit='add')
+        self.add_or_edit.addSignal.connect(self.add_edit_function)
+        self.add_or_edit.show()
 
+    #编辑
     @staticmethod
     def edit_function(self):
         print('编辑事件')
 
-
     # 删除
-    @staticmethod
     def delete_function(self):
         print('删除事件')
+        cur_row = self.tableWidget.currentRow()
+        code = self.tableWidget.item(cur_row, 0)
+        if code:
+            reply = QMessageBox.question(self, '删除', '确定删除('+code.text()+')的信息?',
+                                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.tableWidget.removeRow(cur_row)
+
+    def add_edit_function(self, res):
+        print('添加/编辑:', res)
+
+        section = str(res['名称'])
+        row_count = self.tableWidget.rowCount()
+        self.tableWidget.insertRow(row_count)
+        self.tableWidget.setItem(row_count, 0, QTableWidgetItem(section))
+
+        config = configparser.ConfigParser()
+        try:
+            config.read(self.table_ini_path, encoding='utf-8')
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"读取文件失败: {str(e)}")
+            return
+
+        config.add_section(section)
+        # 设置键值对
+        config.set(section, '偏移', res['偏移'])
+        config.set(section, '数据长度', res['数据长度'])
+        config.set(section, '整形类型', res['整形类型'])
+        config.set(section, '颜色', res['颜色'])
+
+        # 写入文件
+        with open(self.table_ini_path, 'w') as configfile:
+            config.write(configfile)
 
 
 if __name__ == '__main__':
