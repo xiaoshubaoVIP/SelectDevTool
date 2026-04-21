@@ -41,8 +41,7 @@ class addFunction(QWidget):
 
         self.resize(320, 100)
 
-        self.akshare = None
-        self.msgBox = None
+        self.select_colour = '#000000'
 
         self.add_or_edit = add_or_edit
 
@@ -84,7 +83,7 @@ class addFunction(QWidget):
 
 
     def set_colour(self, color):
-        self.colour_line_edit.setText(str(color))
+        self.select_colour = color
         self.colour_line_edit.setStyleSheet(f"background-color: {color}")
 
     def bt1_confirm(self):
@@ -93,7 +92,7 @@ class addFunction(QWidget):
             '偏移': self.index_line_edit.text(),
             '数据长度': self.length_combox.currentText(),
             '整形类型': self.integer_combox.currentText(),
-            '颜色': self.colour_line_edit.text(),
+            '颜色': self.select_colour,
         }
         self.addSignal.emit(set_data)
         self.close()
