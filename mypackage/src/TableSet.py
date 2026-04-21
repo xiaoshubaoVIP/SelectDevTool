@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from PyQt5 import QtCore
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt, QDir
 from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import *
@@ -112,18 +112,33 @@ class TableSet(QWidget):
             self.tableWidget.insertRow(row_index)
             options = config.options(section)
 
-            name_item = QTableWidgetItem(str(section))
-            name_item.setFlags(name_item.flags() ^ Qt.ItemIsEditable)  # 设为只读（可选）
-            name_item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)  # 显示为水平居中、垂直居中
-            self.tableWidget.setItem(row_index, 0, name_item)
+            # 控件居中方法：
+            checkbox = QCheckBox()              # 定义checkbox控件
+            checkbox.setChecked(True)           # 默认全部勾选
+
+            name_label = QLabel(str(section))   # 定义QLabelx控件
+
+            # 1.实例化一个新布局
+            item_layout = QtWidgets.QHBoxLayout()
+            # 2.在布局里添加checkBox
+            item_layout.addWidget(checkbox)
+            item_layout.addWidget(name_label)
+            # 3.在布局里居中放置checkBox并设置水平居中
+            item_layout.setAlignment(Qt.AlignLeft)
+            # 4.实例化一个QWidget（控件）
+            widget = QtWidgets.QWidget()
+            # 5.在QWidget放置布局
+            widget.setLayout(item_layout)
+
+            self.tableWidget.setCellWidget(row_index, 0, widget)
 
             column_index = 1
             for option in options:
-                item = config.get(section, option)
-                new_item = QTableWidgetItem(str(item))
+                #item = config.get(section, option)
+                new_item = QTableWidgetItem(None)
                 new_item.setFlags(new_item.flags() ^ Qt.ItemIsEditable)  # 设为只读（可选）
                 new_item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)  # 显示为水平居中、垂直居中
-                print(row_index, column_index, item)
+                # print(row_index, column_index, item)
                 self.tableWidget.setItem(row_index, column_index, new_item)
                 column_index = column_index + 1
             row_index = row_index + 1
