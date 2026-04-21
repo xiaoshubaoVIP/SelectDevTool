@@ -178,6 +178,14 @@ class UartSetWidget(QWidget):
     #@staticmethod
     def bt_save(self):
         print("保存配置")
+        dict_uart_set_param = {
+                            'port':self.cb_com.currentText(),
+                            'baudrate':int(self.cb_baud.currentText()),
+                            'bytesize':self.dict_data.get(self.cb_data_bit.currentText(), 8),
+                            'parity':self.dict_parity.get(self.cb_parity_bit.currentText(), 'N'),
+                            'stopbits':self.dict_stop.get(self.cb_stop_bit.currentText(), 1)
+                           }
+        self.uart_process_signal.emit('save', dict_uart_set_param)
         self.save_ini()
         self.close()
 
