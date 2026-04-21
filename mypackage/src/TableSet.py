@@ -49,14 +49,47 @@ class TableSet(QWidget):
         layout=QHBoxLayout()
 
         #实现的效果是一样的，四行三列，所以要灵活运用函数，这里只是示范一下如何单独设置行列
-        self.tableWidget=QTableWidget(1,8)
+        self.tableWidget=QTableWidget(0,4)
 
-        # TableWidget = QTableWidget()
-        # TableWidget.setRowCount(4)
-        # TableWidget.setColumnCount(3)
+        # #调用所有接口居中显示
+        # self.set_table_widget_contents_center(remove_flag=False)
 
-        #设置水平方向的表头标签与垂直方向上的表头标签，注意必须在初始化行列之后进行，否则，没有效果
-        self.tableWidget.setHorizontalHeaderLabels(['名称','当前值','最大值', '最小值'])
+        layout.addWidget(self.tableWidget)
+
+        self.setLayout(layout)
+
+        #右击事件
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
+        # 加载数据
+        table_ini_path = QtCore.QDir.currentPath() + '/setting/' + 'table.ini'
+        self.load_ini_to_table(table_ini_path)
+
+    def load_ini_to_table(self, file_path):
+        # 1. 检查文件是否存在
+        if not os.path.exists(file_path):
+            QMessageBox.warning(self, "错误", f"找不到文件: {file_path}")
+            return
+
+        # 2. 初始化 ConfigParser 并读取文件
+        config = configparser.ConfigParser()
+        try:
+            config.read(file_path, encoding='utf-8')
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"读取文件失败: {str(e)}")
+            return
+
+        # 3. 配置 TableWidget 基础属性
+        self.tableWidget.setStyleSheet("background-color: white;")
+        # 关闭交替行颜色，否则即使设置了背景色，它也会每隔一行显示一种默认颜色
+        self.tableWidget.setAlternatingRowColors(False)
+
+        self.tableWidget.clear()  # 清空旧数据
+
+        # 设置水平方向的表头标签与垂直方向上的表头标签，注意必须在初始化行列之后进行，否则，没有效果
+        self.tableWidget.setHorizontalHeaderLabels(["名称", "当前值", "最大值", "最小值"])
+
         #Todo 优化1 设置垂直方向的表头标签
         #self.tableWidget.setVerticalHeaderLabels(['行1', '行2', '行3', '行4'])
 
@@ -70,88 +103,35 @@ class TableSet(QWidget):
         self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectRows)
 
         #TODO 优化 5 将行与列的高度设置为所显示的内容的宽度高度匹配
-        # QTableWidget.resizeColumnsToContents(self.tableWidget)
-        # QTableWidget.resizeRowsToContents(self.tableWidget)
         self.tableWidget.resizeColumnsToContents()
         self.tableWidget.resizeRowsToContents()
 
-        #TODO 优化 6 表格头的显示与隐藏
-        #self.tableWidget.verticalHeader().setVisible(False)
-        #self.tableWidget.horizontalHeader().setVisible(False)
+        # 4. 遍历 INI 文件内容
+        # config.sections() 获取所有的节点名，例如 [Serial], [Network]
+        sections = config.sections()
+        row_index = 0
+        for section in sections:
+            self.tableWidget.insertRow(row_index)
+            options = config.options(section)
 
-        #TOdo 优化7 在单元格内放置控件
-        # comBox=QComboBox()
-        # comBox.addItems(['男','女'])
-        # comBox.addItem('未知')
-        # comBox.setStyleSheet('QComboBox{margin:3px}')
-        # self.tableWidget.setCellWidget(0,1,comBox)
-        #
-        # searchBtn=QPushButton('修改')
-        # searchBtn.setDown(True)
-        # searchBtn.setStyleSheet('QPushButton{margin:3px}')
-        # self.tableWidget.setCellWidget(0,2,searchBtn)
+            name_item = QTableWidgetItem(str(section))
+            name_item.setFlags(name_item.flags() ^ Qt.ItemIsEditable)  # 设为只读（可选）
+            name_item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)  # 显示为水平居中、垂直居中
+            self.tableWidget.setItem(row_index, 0, name_item)
 
-        #TODO 优化 8 添加数据,表格字体居中显示
-        self.load_table_ini()
+            column_index = 1
+            for option in options:
+                item = config.get(section, option)
+                new_item = QTableWidgetItem(str(item))
+                new_item.setFlags(new_item.flags() ^ Qt.ItemIsEditable)  # 设为只读（可选）
+                new_item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)  # 显示为水平居中、垂直居中
+                print(row_index, column_index, item)
+                self.tableWidget.setItem(row_index, column_index, new_item)
+                column_index = column_index + 1
+            row_index = row_index + 1
 
-        #调用所有接口居中显示
-        self.set_table_widget_contents_center(remove_flag=False)
-
-        layout.addWidget(self.tableWidget)
-
-        self.setLayout(layout)
-
-        #TabelWidget鼠标点击事件
-        #self.tableWidget.cellClicked.connect(self.onCellClicked)
-        #self.tableWidget.itemClicked.connect(self.onItemClicked)
-
-        #右击事件
-        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.show_context_menu)
-
-    # 两种方法读取csv文件显示到table widget
-    # 方法1 pandas库读取csv文件
-    # 方法2 使用CSV数据填充QTableWidget
-    def load_table_ini(self):
-        self.tableWidget.clear()     # 清空原有表格内容
-
-        #读取ini配置文件
-        table_ini_path = QtCore.QDir.currentPath() + '/setting/' + 'table.ini'
-        conf = configparser.ConfigParser()  # 需要实例化一个ConfigParser对象
-        if Path(table_ini_path).is_file():
-            print('table.ini存在')
-            conf.read(table_ini_path, encoding='utf-8')
-        else:
-            print("table.ini不存在")
-            conf.add_section('示例')
-            conf.set('示例','当前值', '6666')
-            conf.set('示例', '最大值', '8888')
-            conf.set('示例', '最小值', '1111')
-
-            with open(table_ini_path, 'w', encoding='utf-8') as f:
-                conf.write(f)
-
-        # input_table_rows = input_table.shape[0]  # 获取表格行数
-        # input_table_columns = input_table.shape[1]  # 获取表格列数
-        # input_table_header = input_table.columns.values.tolist()  # 获取表头
-        # ###===========读取表格，转换表格，==============================
-        # ###===========给tableWidget设置行列表头========================
-        # self.tableWidget.setColumnCount(input_table_columns)  # 设置表格列数
-        # self.tableWidget.setRowCount(input_table_rows)  # 设置表格行数
-        # self.tableWidget.setHorizontalHeaderLabels(input_table_header)  # 给tablewidget设置行列表头
-        # ###===========遍历表格每个元素，同时添加到tableWidget中===========
-        # for i in range(input_table_rows):  # 行循环
-        #     input_table_rows_values = input_table.iloc[[i]]  # 读入一行数据
-        #     input_table_rows_values_array = np.array(input_table_rows_values)  # 将该行数据放入数组中
-        #     input_table_rows_values_list = input_table_rows_values_array.tolist()[0]  # 将该数组转换为列表
-        #     for j in range(input_table_columns):  # 列循环
-        #         input_table_items_list = input_table_rows_values_list[j]  # 行列表中的每个元素放入列列表中
-        #         ###==============将遍历的元素添加到tableWidget中并显示=======================
-        #         input_table_items = str(input_table_items_list)  # 该数据转换成字符串
-        #         new_item = QTableWidgetItem(input_table_items)  # 该字符串类型的数据新建为tableWidget元素
-        #         new_item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)  # 显示为水平居中、垂直居中
-        #         self.tableWidget.setItem(i, j, new_item)  # 在表格第i行第j列显示newItem元素
-
+        # 5. 自动调整列宽
+        self.tableWidget.resizeColumnsToContents()
 
     def set_table_widget_contents_center(self, remove_flag):
         data = []
@@ -176,9 +156,6 @@ class TableSet(QWidget):
         # self.stock_data = GetStockDataCycle(self.list_code, cycle_flag=True, frequency=1000)
         # self.stock_data.FreshSignal.connect(self.fresh_stock_data)
         return data
-
-    def save_csv(self):
-        print()
 
 
     def show_context_menu(self, pos):
@@ -207,32 +184,25 @@ class TableSet(QWidget):
             print('右击事件')
 
 
-    #添加股票
+    #添加
+    @staticmethod
     def add_function(self):
         print('添加事件')
-        self.add_class = addFunction(add_or_edit='add', str1=None, str2=None, str3=None)
-        self.add_class.addSignal.connect(self.add_edit_function_ok)
-        self.add_class.setWindowFlag(Qt.WindowStaysOnTopHint)
-        self.add_class.show()
 
     @staticmethod
     def edit_function(self):
         print('编辑事件')
 
 
-    # 删除股票
+    # 删除
     @staticmethod
     def delete_function(self):
-        print('删除')
-
-    @staticmethod
-    def add_edit_function_ok(self, add_data):
-        print('添加完成')
+        print('删除事件')
 
 
 if __name__ == '__main__':
     app=QApplication(sys.argv)
-    win=TableWidget(None)
+    win=TableSet(None)
     win.show()
     sys.exit(app.exec_())
 
