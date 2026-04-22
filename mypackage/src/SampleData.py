@@ -10,7 +10,7 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import QDir, ws, Qt
 from PyQt5.QtGui import QPen, QBrush, QColor
 from PyQt5.QtWidgets import QWidget, QPushButton, QLineEdit, QTextEdit, QVBoxLayout, QHBoxLayout, QFileDialog, \
-    QComboBox, QLabel, QGridLayout, QSplitter, QRadioButton
+    QComboBox, QLabel, QGridLayout, QSplitter, QRadioButton, QMessageBox
 
 from QCustomPlot_PyQt5 import QCustomPlot
 
@@ -55,7 +55,7 @@ class SampleData(QWidget):
         #串口基本信息
         #port显示
         self.combox_uart_port = QComboBox()
-        self.combox_uart_port.setFixedSize(100, 25)
+        self.combox_uart_port.setFixedSize(75, 25)
         self.combox_uart_port.setStyleSheet("QComboBox { background-color: white; }")
         self.combox_uart_port.addItems(self.list_port)
         try:
@@ -65,7 +65,7 @@ class SampleData(QWidget):
         self.combox_uart_port.setCurrentIndex(port_index)
         #baud显示
         self.combox_uart_baud = QComboBox()
-        self.combox_uart_baud.setFixedSize(100, 25)
+        self.combox_uart_baud.setFixedSize(75, 25)
         self.combox_uart_baud.setStyleSheet("QComboBox { background-color: white; }")
         self.combox_uart_baud.addItems(self.list_baud)
         try:
@@ -233,14 +233,19 @@ class SampleData(QWidget):
             self.line_edit_path.setText(folder_path)
 
     def show_save_dialog(self):
+        content = self.text_edit.toPlainText()
+        if not content:
+            QMessageBox.warning(self, "警告", "文本框内容为空，无需保存！")
+            return
+
         #获取当前时间作为文件名
         timestamp = time.time()
         local_time = time.localtime(timestamp)
         formatted_time = time.strftime('%Y-%m-%d_%H%M%S', local_time)
 
         # 使用 os.path.normpath 规范化路径，避免非法字符
-        default_dir = os.path.normpath(QtCore.QDir.currentPath() + '/save/')
-        default_file = self.label_uart_port.currentText() + formatted_time + '.txt'
+        default_dir = os.path.normpath(QtCore.QDir.currentPath() + '/output/')
+        default_file = formatted_time + '.txt'
         full_path = os.path.join(default_dir, default_file)  # 使用 os.path.join 处理路径分隔符
 
         print("保存路径:", default_dir)
@@ -250,24 +255,19 @@ class SampleData(QWidget):
 
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            '保存 Excel 文件',
+            '保存 txt 文件',
             full_path,
-            'Excel Files (*.txt)'
+            'txt files (*.txt)'
         )
 
         if file_path:
             print("确认保存:",file_path)
-            self.save_file(file_path)
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                self.text_edit.append(self.valid.format("保存日志成功✅"))
+            except Exception as e:
+                print(f"❌ 写入失败，错误信息: {e}")
+                self.text_edit.append(self.error.format("保存日志失败，确保文件在关闭状态❌"))
         else:
             print("取消保存")
-
-    def save_file(self, save_file):
-        try:
-            print(self.df)
-            print("✅ 文件写入成功！")
-        except Exception as e:
-            print(f"❌ 写入失败，错误信息: {e}")
-            self.text_edit.append(self.error.format("写入excel失败，确保文件在关闭状态❌"))
-
-        # 请求完成
-        self.text_edit.append(self.valid.format("刷选完成✅ "))
