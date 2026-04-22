@@ -13,7 +13,7 @@ from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import *
 from pandas.core.interchange.dataframe_protocol import DataFrame
 
-from mypackage.src.TableAddEdit import addFunction
+from mypackage.src.TableAddEdit import AddFunction
 
 
 class TableSet(QWidget):
@@ -24,12 +24,17 @@ class TableSet(QWidget):
         self.tableWidget = None
         self.add_or_edit = None
 
+        #右击选中表格行时
         self.add_action = QAction("添加", self)
         self.edit_action = QAction("编辑", self)
         self.delete_action = QAction("删除", self)
         self.add_action.triggered.connect(self.add_function)
         self.edit_action.triggered.connect(self.edit_function)
         self.delete_action.triggered.connect(self.delete_function)
+        #右击不是行时
+        self.input_action = QAction("导入", self)
+        self.output_action = QAction("导出", self)
+
 
         # 获取当前目录的上一级
         temp_path = QDir.currentPath()
@@ -149,7 +154,6 @@ class TableSet(QWidget):
     def show_context_menu(self, pos):
         select_row = self.tableWidget.currentRow()
 
-
         # 转换坐标系
         row_num = None
         for i in self.tableWidget.selectionModel().selection().indexes():
@@ -169,6 +173,8 @@ class TableSet(QWidget):
             print("sss")
             menu = QMenu(self)
             menu.addAction(self.add_action)
+            menu.addAction(self.input_action)
+            menu.addAction(self.output_action)
             print(QCursor.pos())
             menu.exec_(QCursor.pos())
 
@@ -176,14 +182,40 @@ class TableSet(QWidget):
     #添加
     def add_function(self):
         print('添加事件')
-        self.add_or_edit = addFunction(add_or_edit='add')
+        self.add_or_edit = AddFunction(cmd='add', param=None)
         self.add_or_edit.addSignal.connect(self.add_edit_function)
         self.add_or_edit.show()
 
     #编辑
-    @staticmethod
     def edit_function(self):
         print('编辑事件')
+        cur_row = self.tableWidget.currentRow()
+        item = self.tableWidget.cellWidget(cur_row, 0)
+        if item is not None:
+            target_label = item.findChild(QtWidgets.QLabel)
+            if target_label is not None:
+                section_name = target_label.text()
+                #从ini文件加载信息
+                config = configparser.ConfigParser()
+                try:
+                    config.read(self.table_ini_path, encoding='utf-8')
+                    ini_info = {
+                        '名称': section_name,
+                        '偏移': config.get(section_name, '偏移'),
+                        '数据长度': config.get(section_name, '数据长度'),
+                        '整形类型': config.get(section_name, '整形类型'),
+                        '颜色': config.get(section_name, '颜色'),
+                    }
+
+                    #显示加载的section信息
+                    self.add_or_edit = AddFunction(cmd='edit', param=ini_info)
+                    self.add_or_edit.addSignal.connect(self.add_edit_function)
+                    self.add_or_edit.show()
+
+                except Exception as e:
+                    QMessageBox.critical(self, "错误", f"读取文件失败: {str(e)}")
+                    return
+
 
     # 删除
     def delete_function(self):
@@ -211,32 +243,34 @@ class TableSet(QWidget):
                         config.write(configfile)
 
     #添加和编辑处理函数
-    def add_edit_function(self, res):
+    def add_edit_function(self, cmd, res):
         print('添加/编辑:', res)
 
         section = str(res['名称'])
-        row_count = self.tableWidget.rowCount()
-        self.tableWidget.insertRow(row_count)
 
-        # 控件居中方法：
-        checkbox = QCheckBox()  # 定义checkbox控件
-        checkbox.setChecked(True)  # 默认全部勾选
+        if cmd == 'add':
+            row_count = self.tableWidget.rowCount()
+            self.tableWidget.insertRow(row_count)
 
-        name_label = QLabel(str(section))  # 定义QLabelx控件
+            # 控件居中方法：
+            checkbox = QCheckBox()  # 定义checkbox控件
+            checkbox.setChecked(True)  # 默认全部勾选
 
-        # 1.实例化一个新布局
-        item_layout = QtWidgets.QHBoxLayout()
-        # 2.在布局里添加checkBox
-        item_layout.addWidget(checkbox)
-        item_layout.addWidget(name_label)
-        # 3.在布局里居中放置checkBox并设置水平居中
-        item_layout.setAlignment(Qt.AlignLeft)
-        # 4.实例化一个QWidget（控件）
-        widget = QtWidgets.QWidget()
-        # 5.在QWidget放置布局
-        widget.setLayout(item_layout)
+            name_label = QLabel(str(section))  # 定义QLabelx控件
 
-        self.tableWidget.setCellWidget(row_count, 0, widget)
+            # 1.实例化一个新布局
+            item_layout = QtWidgets.QHBoxLayout()
+            # 2.在布局里添加checkBox
+            item_layout.addWidget(checkbox)
+            item_layout.addWidget(name_label)
+            # 3.在布局里居中放置checkBox并设置水平居中
+            item_layout.setAlignment(Qt.AlignLeft)
+            # 4.实例化一个QWidget（控件）
+            widget = QtWidgets.QWidget()
+            # 5.在QWidget放置布局
+            widget.setLayout(item_layout)
+
+            self.tableWidget.setCellWidget(row_count, 0, widget)
 
         config = configparser.ConfigParser()
         try:
@@ -245,6 +279,7 @@ class TableSet(QWidget):
             QMessageBox.critical(self, "错误", f"读取文件失败: {str(e)}")
             return
 
+        config.remove_section(section)
         config.add_section(section)
         # 设置键值对
         config.set(section, '偏移', res['偏移'])

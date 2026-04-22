@@ -31,10 +31,10 @@ class ClickableLineEdit(QLineEdit):
         super().mousePressEvent(event)
 
 
-class addFunction(QWidget):
-    addSignal = pyqtSignal(dict)
+class AddFunction(QWidget):
+    addSignal = pyqtSignal(str, dict)
 
-    def __init__(self, add_or_edit):
+    def __init__(self, cmd, param):
         super().__init__()
 
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.SubWindow)
@@ -43,24 +43,54 @@ class addFunction(QWidget):
 
         self.select_colour = '#000000'
 
-        self.add_or_edit = add_or_edit
+        self.add_or_edit = cmd
+        self.cmd= cmd
+        self.param = param
 
+        if self.cmd == 'add':
+            self.name = QLabel("名称")
+            self.name_line_edit = QLineEdit()
+            self.index = QLabel("偏移")
+            self.index_line_edit = QLineEdit()
+            self.length = QLabel("数据长度")
+            self.length_combox = QComboBox()
+            self.length_combox.addItems(['1', '2', '4'])
+            self.integer = QLabel("整形类型")
+            self.integer_combox = QComboBox()
+            self.integer_combox.addItems(['signed', 'unsigned'])
+            self.colour = QLabel("颜色")
+            # self.colour_line_edit = QLineEdit()
+            self.colour_line_edit = ClickableLineEdit(self)
+            self.colour_line_edit.setStyleSheet("background-color: black;")
+            self.colour_line_edit.colorSignal.connect(self.set_colour)
+        else:
+            self.name = QLabel("名称")
+            self.name_line_edit = QLineEdit(self.param['名称'])
+            self.index = QLabel("偏移")
+            self.index_line_edit = QLineEdit(self.param['偏移'])
 
-        self.name = QLabel("名称")
-        self.name_line_edit = QLineEdit()
-        self.index = QLabel("偏移")
-        self.index_line_edit = QLineEdit()
-        self.length = QLabel("数据长度")
-        self.length_combox = QComboBox()
-        self.length_combox.addItems(['1', '2', '4'])
-        self.integer = QLabel("整形类型")
-        self.integer_combox = QComboBox()
-        self.integer_combox.addItems(['signed', 'unsigned'])
-        self.colour = QLabel("颜色")
-        # self.colour_line_edit = QLineEdit()
-        self.colour_line_edit = ClickableLineEdit(self)
-        self.colour_line_edit.setStyleSheet("background-color: black;")
-        self.colour_line_edit.colorSignal.connect(self.set_colour)
+            self.length = QLabel("数据长度")
+            self.length_combox = QComboBox()
+            self.length_combox.addItems(['1', '2', '4'])
+            if self.param['数据长度'] == '1':
+                self.length_combox.setCurrentIndex(0)
+            elif self.param['数据长度'] == '2':
+                self.length_combox.setCurrentIndex(1)
+            else:
+                self.length_combox.setCurrentIndex(2)
+
+            self.integer = QLabel("整形类型")
+            self.integer_combox = QComboBox()
+            self.integer_combox.addItems(['signed', 'unsigned'])
+            if self.param['整形类型'] == 'signed':
+                self.integer_combox.setCurrentIndex(0)
+            else:
+                self.integer_combox.setCurrentIndex(1)
+
+            self.colour = QLabel("颜色")
+            self.colour_line_edit = ClickableLineEdit(self)
+            self.colour_line_edit.setStyleSheet(f"background-color: {self.param['颜色']}")
+            self.colour_line_edit.colorSignal.connect(self.set_colour)
 
         self.push_button_1 = QPushButton('确认',self)
         self.push_button_1.setStyleSheet("background-color: rgb(255,255,255); color: black;")
@@ -94,7 +124,7 @@ class addFunction(QWidget):
             '整形类型': self.integer_combox.currentText(),
             '颜色': self.select_colour,
         }
-        self.addSignal.emit(set_data)
+        self.addSignal.emit(self.cmd, set_data)
         self.close()
         print("完成添加")
 
@@ -104,6 +134,6 @@ class addFunction(QWidget):
 
 if __name__ == '__main__':
     test = QApplication(sys.argv)
-    ex = addFunction(add_or_edit='add')
+    ex = AddFunction(cmd='add', param=None)
     ex.show()
     sys.exit(test.exec_())
