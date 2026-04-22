@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import QWidget, QPushButton, QLineEdit, QTextEdit, QVBoxLay
 
 from QCustomPlot_PyQt5 import QCustomPlot
 
+from mypackage.src.PlotWidget import PlotWidget
 from mypackage.src.SerialThread import SerialThread
 from mypackage.src.TableSet import TableSet
 from mypackage.src.UartSetWidget import UartSetWidget
@@ -98,16 +99,8 @@ class SampleData(QWidget):
         self.text_edit = QTextEdit()
         self.text_edit.setStyleSheet("QTextEdit { background-color: white; }")
 
-        #
-        self.customPlot = QCustomPlot(self)
-        # self.gridLayout = QGridLayout(self).addWidget(self.customPlot)
-        # add two new graphs and set their look:
-        self.customPlot.addGraph()
-        self.customPlot.graph(0).setPen(QPen(Qt.blue))  # line color blue for first graph
-        self.customPlot.graph(0).setBrush(
-            QBrush(QColor(0, 0, 255, 20)))  # first graph will be filled with translucent blue
-        self.customPlot.addGraph()
-        self.customPlot.graph(1).setPen(QPen(Qt.red))  # line color red for second graph
+        #实例化plot
+        self.customPlot = PlotWidget()
 
         #布局
         stack_main_layout = QVBoxLayout()
