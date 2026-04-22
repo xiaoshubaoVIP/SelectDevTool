@@ -41,13 +41,12 @@ class AddFunction(QWidget):
 
         self.resize(320, 100)
 
-        self.select_colour = '#000000'
-
         self.add_or_edit = cmd
         self.cmd= cmd
         self.param = param
 
         if self.cmd == 'add':
+            self.select_colour = '#000000'
             self.name = QLabel("名称")
             self.name_line_edit = QLineEdit()
             self.index = QLabel("偏移")
@@ -64,6 +63,7 @@ class AddFunction(QWidget):
             self.colour_line_edit.setStyleSheet("background-color: black;")
             self.colour_line_edit.colorSignal.connect(self.set_colour)
         else:
+            self.select_colour = self.param['颜色']
             self.name = QLabel("名称")
             self.name_line_edit = QLineEdit(self.param['名称'])
             self.index = QLabel("偏移")

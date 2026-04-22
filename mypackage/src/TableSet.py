@@ -137,15 +137,6 @@ class TableSet(QWidget):
 
             self.tableWidget.setCellWidget(row_index, 0, widget)
 
-            column_index = 1
-            for option in options:
-                #item = config.get(section, option)
-                new_item = QTableWidgetItem(None)
-                new_item.setFlags(new_item.flags() ^ Qt.ItemIsEditable)  # 设为只读（可选）
-                new_item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)  # 显示为水平居中、垂直居中
-                # print(row_index, column_index, item)
-                self.tableWidget.setItem(row_index, column_index, new_item)
-                column_index = column_index + 1
             row_index = row_index + 1
 
         # 5. 自动调整列宽
