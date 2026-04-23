@@ -43,7 +43,7 @@ class SampleData(QWidget):
         print(self.list_port)
 
         #graph信息
-        self.dict_graph_info = {}
+        self.list_graph_info = []
 
         #串口对象
         self.set_uart_form = None
@@ -269,12 +269,22 @@ class SampleData(QWidget):
 
     def add_success_function(self, info):
         name = info['名称']
-        self.dict_graph_info[name] = info
+        self.list_graph_info.append(info)
         self.text_edit.append(self.valid.format(f"添加绘图对象:{name}✅"))
         self.customPlot.add_graph(info['名称'], info['颜色'])
 
     def serial_thread_receive_data_process(self, receive_data):
         print('receive:', receive_data)
-        print(self.dict_graph_info)
+        # print(self.list_graph_info)
         self.text_edit.append(receive_data)
-        # self.customPlot.add_data(self.dict_graph_info[])
+        hex_str =  ''.join(f'{ord(c):02x}' for c in receive_data)
+        for info in self.list_graph_info:
+            char_index = 10 + int(info['偏移']) * 2
+            data_len = int(info['数据长度'])*2
+            target_hex = hex_str[char_index:char_index+data_len]
+            print(hex_str)
+            print(info['名称'], f"0x{target_hex}", char_index, data_len)
+            if target_hex:
+                decimal_value = int(target_hex, 16)
+                timestamp = time.time()
+                self.customPlot.add_data(info['名称'], timestamp, decimal_value)

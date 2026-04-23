@@ -4,7 +4,7 @@ import sys
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPen, QColor
 from PyQt5.QtWidgets import QWidget, QApplication, QVBoxLayout
-from QCustomPlot_PyQt5 import QCustomPlot, QCP
+from QCustomPlot_PyQt5 import QCustomPlot, QCP, QCPGraph
 
 from mypackage.src.TraceData import TraceData
 
@@ -58,32 +58,35 @@ class PlotWidget(QWidget):
 
     def add_graph(self, name, color):
         graph = self.custom_plot.addGraph()
-        graph.setPen(QPen(QColor(color), 2))  # 颜色，线宽
-        graph.setName(str(name))  # 图例名称
+        graph.setPen(QPen(QColor(color), 2))    # 颜色，线宽
+        graph.setName(str(name))                # 图例名称
 
-        self.graph_dict[name] = graph  # 字典添加
+        self.graph_dict[name] = graph           # 字典添加
 
         trace = TraceData(self.custom_plot, graph)
-        self.trace_dict[name] = trace  # 字典添加
+        self.trace_dict[name] = trace           # 字典添加
 
         self.set_graph_visible(name, True)
 
     def add_data(self, name, time_stamp, value):
         """重载函数：添加单点数据"""
         graph = self.graph_dict[name]
+
         if not graph: return
 
         if self.start_time_stamp == 0:
             self.start_time_stamp = time_stamp
 
         time = time_stamp - self.start_time_stamp
-        graph.setData(time, value)
 
-        if graph.visible():
-            trace = self.trace_dict[name]
-            trace.update()
-            self.replot_text_timer.stop()
-            self.replot_text_timer.start()
+
+        graph.addData(time, value)
+
+        # if graph.visible():
+        #     trace = self.trace_dict[name]
+        #     trace.update()
+        #     self.replot_text_timer.stop()
+        #     self.replot_text_timer.start()
 
         self.replot()
 
