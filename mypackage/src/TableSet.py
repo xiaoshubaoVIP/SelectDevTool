@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import Qt, QDir
+from PyQt5.QtCore import Qt, QDir, pyqtSignal
 from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import *
 from pandas.core.interchange.dataframe_protocol import DataFrame
@@ -17,6 +17,8 @@ from mypackage.src.TableAddEdit import AddFunction
 
 
 class TableSet(QWidget):
+    addResSignal = pyqtSignal(dict)
+
     def __init__(self):
         super().__init__()
         #super(TableWidget, self).__init__(parent)
@@ -282,6 +284,8 @@ class TableSet(QWidget):
         with open(self.table_ini_path, 'w', encoding='utf-8') as configfile:
             config.write(configfile)
 
+        print("send:", res)
+        self.addResSignal.emit(res)
 
 if __name__ == '__main__':
     app=QApplication(sys.argv)

@@ -1,5 +1,6 @@
 import configparser
 import os
+import threading
 import time
 from pathlib import Path
 
@@ -40,6 +41,10 @@ class SampleData(QWidget):
             self.conf.read(self.ini_path, encoding='utf-8')
 
         print(self.list_port)
+
+        #graph信息
+        self.dict_graph_info = {}
+
         #串口对象
         self.set_uart_form = None
         self.serial_thread = None
@@ -94,6 +99,7 @@ class SampleData(QWidget):
 
         #实例化tableWidget
         self.table = TableSet()
+        self.table.addResSignal.connect(self.add_success_function)
 
         #实例化textEdit并加入布局
         self.text_edit = QTextEdit()
@@ -209,10 +215,6 @@ class SampleData(QWidget):
         else:
             self.text_edit.append(self.warning.format(f"串口:{result_msg}⚠️"))
 
-    def serial_thread_receive_data_process(self, receive_data):
-        print('receive:', receive_data)
-        self.text_edit.append(receive_data)
-
     def get_dir(self):
         dialog = QFileDialog()
         dialog.options = QFileDialog.Options()
@@ -264,3 +266,15 @@ class SampleData(QWidget):
                 self.text_edit.append(self.error.format("保存日志失败，确保文件在关闭状态❌"))
         else:
             print("取消保存")
+
+    def add_success_function(self, info):
+        name = info['名称']
+        self.dict_graph_info[name] = info
+        self.text_edit.append(self.valid.format(f"添加绘图对象:{name}✅"))
+        self.customPlot.add_graph(info['名称'], info['颜色'])
+
+    def serial_thread_receive_data_process(self, receive_data):
+        print('receive:', receive_data)
+        print(self.dict_graph_info)
+        self.text_edit.append(receive_data)
+        # self.customPlot.add_data(self.dict_graph_info[])
