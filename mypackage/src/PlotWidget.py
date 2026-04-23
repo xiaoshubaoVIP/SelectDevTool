@@ -8,6 +8,35 @@ from QCustomPlot_PyQt5 import QCustomPlot, QCP, QCPGraph
 
 from mypackage.src.TraceData import TraceData
 
+
+class MyCustomPlot(QCustomPlot):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        # 1. 开启交互总开关
+        self.setInteractions(QCP.iRangeDrag | QCP.iRangeZoom)
+
+        # 2. 设置默认拖拽和缩放方向
+        self.axisRect().setRangeDrag(Qt.Horizontal | Qt.Vertical)
+        self.axisRect().setRangeZoom(Qt.Horizontal)  # 默认为水平缩放
+
+    def wheelEvent(self, event):
+        """
+        在这里拦截滚轮事件，根据 Ctrl 键动态修改缩放轴
+        """
+        # 1. 检查是否按住了 Ctrl 键
+        if event.modifiers() & Qt.ControlModifier:
+            # 按住 Ctrl：只缩放 Y 轴 (垂直)
+            print("Ctrl 按下 -> 缩放 Y 轴")
+            self.axisRect().setRangeZoom(Qt.Vertical)
+        else:
+            # 未按 Ctrl：只缩放 X 轴 (水平)
+            print("Ctrl 未按下 -> 缩放 X 轴")
+            self.axisRect().setRangeZoom(Qt.Horizontal)
+
+        # 2. 调用父类 (QCustomPlot) 的 wheelEvent 执行实际缩放
+        super().wheelEvent(event)
+
 class PlotWidget(QWidget):
     def __init__(self):
         super().__init__()
@@ -29,12 +58,9 @@ class PlotWidget(QWidget):
         self.replot_text_timer.timeout.connect(self.update_text_position)
 
         # 1. 创建 QCustomPlot 对象
-        self.custom_plot = QCustomPlot(self)
+        self.custom_plot = MyCustomPlot()
 
-        # 2. 配置交互功能 (核心部分)
-        self.setup_interactions()
-
-        # 3. 创建布局并将 custom_plot 添加进去
+        # 2. 创建布局并将 custom_plot 添加进去
         layout = QVBoxLayout()
         layout.addWidget(self.custom_plot)
         layout.setContentsMargins(0, 0, 0, 0)  # 去掉边距，让图表贴边
@@ -89,17 +115,6 @@ class PlotWidget(QWidget):
         #     self.replot_text_timer.start()
 
         self.replot()
-
-    def setup_interactions(self):
-        """
-        配置图表的鼠标交互行为
-        """
-        # 启用鼠标拖拽(iRangeDrag)和滚轮缩放(iRangeZoom)
-        self.custom_plot.setInteractions(QCP.iRangeDrag | QCP.iRangeZoom)
-
-        # 设置拖拽和缩放的方向为水平和垂直
-        self.custom_plot.axisRect().setRangeDrag(Qt.Horizontal | Qt.Vertical)
-        self.custom_plot.axisRect().setRangeZoom(Qt.Horizontal | Qt.Vertical)
 
     def set_graph_visible(self, name, on):
         graph = self.graph_dict[name]
