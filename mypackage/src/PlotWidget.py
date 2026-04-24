@@ -6,7 +6,7 @@ from PyQt5.QtGui import QPen, QColor
 from PyQt5.QtWidgets import QWidget, QApplication, QVBoxLayout
 from QCustomPlot_PyQt5 import QCustomPlot, QCP, QCPGraph
 
-from mypackage.src.TraceData import TraceData
+from mypackage.src.TraceData import TraceData, adjust_position
 
 
 class MyCustomPlot(QCustomPlot):
@@ -55,7 +55,7 @@ class PlotWidget(QWidget):
         self.replot_text_timer = QTimer()
         self.replot_text_timer.setInterval(100)
         self.replot_text_timer.setSingleShot(True)
-        self.replot_text_timer.timeout.connect(self.update_text_position)
+        # self.replot_text_timer.timeout.connect(self.update_text_position)
 
         # 1. 创建 QCustomPlot 对象
         self.custom_plot = MyCustomPlot()
@@ -78,23 +78,23 @@ class PlotWidget(QWidget):
             self.custom_plot.replot()
             self.replot_wait = False
 
-    def update_text_position(self):
-        TraceData.adjust_position(list(self.trace_dict.values()))
-        self.custom_plot.replot()
+    # def update_text_position(self):
+    #     adjust_position(list(self.trace_dict.values()))
+    #     self.replot()
 
     def add_graph(self, name, color):
         graph = self.custom_plot.addGraph()
         graph.setPen(QPen(QColor(color), 2))    # 颜色，线宽
-        graph.setName(str(name))                # 图例名称
+        graph.setName(str(name))                # 图例名称，显示右上角
 
-        self.graph_dict[name] = graph           # 字典添加
+        self.graph_dict[name] = graph           # 字典添加graph
 
         trace = TraceData(self.custom_plot, graph)
-        self.trace_dict[name] = trace           # 字典添加
+        self.trace_dict[name] = trace           # 字典添加trace
 
         self.set_graph_visible(name, True)
 
-    def add_data(self, name, time_stamp, value):
+    def add_data(self, name, time_stamp:int, value:int):
         """重载函数：添加单点数据"""
         graph = self.graph_dict[name]
 
@@ -105,14 +105,13 @@ class PlotWidget(QWidget):
 
         time = time_stamp - self.start_time_stamp
 
-
         graph.addData(time, value)
 
-        # if graph.visible():
-        #     trace = self.trace_dict[name]
-        #     trace.update()
-        #     self.replot_text_timer.stop()
-        #     self.replot_text_timer.start()
+        if graph.visible():
+            trace = self.trace_dict[name]
+            trace.update()
+            self.replot_text_timer.stop()
+            self.replot_text_timer.start()
 
         self.replot()
 
@@ -135,53 +134,10 @@ class PlotWidget(QWidget):
         self.replot()
 
 
-
-
-
-
-
-
-
-
-    def add_sine_curve(self):
-        """添加一条正弦曲线"""
-        graph = self.custom_plot.addGraph()
-        graph.setPen(QPen(Qt.blue, 2))  # 蓝色，线宽2
-        graph.setName("sin(x)")  # 图例名称
-
-        # 生成数据
-        x, y = [], []
-        for i in range(500):
-            x_val = i / 50.0
-            x.append(x_val)
-            y.append(math.sin(x_val))
-
-        graph.setData(x, y)
-        self.custom_plot.replot()
-
-    def add_cos_curve(self):
-        """添加一条余弦曲线"""
-        graph = self.custom_plot.addGraph()
-        graph.setPen(QPen(Qt.red, 2, Qt.DashLine))  # 红色，虚线
-        graph.setName("cos(x)")
-
-        # 生成数据
-        x, y = [], []
-        for i in range(500):
-            x_val = i / 50.0
-            x.append(x_val)
-            y.append(math.cos(x_val))
-
-        graph.setData(x, y)
-
-        # 显示图例
-        self.custom_plot.legend.setVisible(True)
-        self.custom_plot.replot()
-
     def rescale_view(self):
         """将所有坐标轴范围调整为显示所有图形"""
         self.custom_plot.rescaleAxes()
-        self.custom_plot.replot()
+        self.replot()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

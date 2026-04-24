@@ -11,8 +11,6 @@ class TraceData(QWidget):
         self.qcustomplot = parent
         self.graph = graph
         self.visible = False
-        self.key = 0.0
-        self.value = 0.0
 
         # 创建 tracer（追踪点）
         self.tracer = QCPItemTracer(self.qcustomplot)
@@ -58,42 +56,35 @@ class TraceData(QWidget):
     def get_label(self) -> QCPItemText:
         return self.label
 
-    def update(self):
+    def update_data(self, x_value:int, y_value:int):
         graph = self.tracer.graph()
-
         if graph.dataCount() > 0:
-            # 获取最后一个数据点
-            it = graph.data().end()
-            it -= 1
-            self.key = it.key
-            self.value = it.value
-
-            self.tracer.setGraphKey(self.key)
+            self.tracer.setGraphKey(x_value)
             self.tracer.updatePosition()
-            self.label.setText(str(self.value))
-
+            self.label.setText(str(y_value))
 
 def compare_by_value(a: TraceData, b: TraceData) -> bool:
     return a.get_value() < b.get_value()
 
 
-def adjust_position(trace_list: list):
+def adjust_position(trace_list):
+    print("调用: adjust_position")
     """静态方法：调整所有可见 trace 的 label 位置，防止重叠"""
-    traces = [t for t in trace_list if t.Visable()]
-
-    # 按 value 排序
-    traces.sort(key=lambda x: x.getValue())
-
-    last_label = None
-    for i, trace in enumerate(traces):
-        curr_label = trace.getLabel()
-        curr_label.position.setCoords(20, 0)
-
-        if last_label is not None:
-            # 如果当前 label 底部像素 y 坐标 > 上一个 label 顶部像素 y 坐标，说明重叠了
-            if curr_label.bottom.pixelPosition().y() > last_label.top.pixelPosition().y():
-                # 把当前 label 往上挪，放到上一个 label 上面一点
-                new_y = last_label.position.pixelPosition().y() - 10
-                curr_label.position.setPixelPosition(QPointF(curr_label.position.pixelPosition().x(), new_y))
-
-        last_label = curr_label
+    # traces = [t for t in trace_list if t.Visable()]
+    #
+    # # 按 value 排序
+    # traces.sort(key=lambda x: x.getValue())
+    #
+    # last_label = None
+    # for i, trace in enumerate(traces):
+    #     curr_label = trace.getLabel()
+    #     curr_label.position.setCoords(20, 0)
+    #
+    #     if last_label is not None:
+    #         # 如果当前 label 底部像素 y 坐标 > 上一个 label 顶部像素 y 坐标，说明重叠了
+    #         if curr_label.bottom.pixelPosition().y() > last_label.top.pixelPosition().y():
+    #             # 把当前 label 往上挪，放到上一个 label 上面一点
+    #             new_y = last_label.position.pixelPosition().y() - 10
+    #             curr_label.position.setPixelPosition(QPointF(curr_label.position.pixelPosition().x(), new_y))
+    #
+    #     last_label = curr_label
