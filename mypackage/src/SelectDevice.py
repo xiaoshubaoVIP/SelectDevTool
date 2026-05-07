@@ -169,41 +169,48 @@ class SelectDevice(QWidget):
             self.text_edit.append(self.valid.format(sheet_name+"配置文件打开✅"))
         except FileNotFoundError as e:
             self.text_edit.append(self.error.format(sheet_name+"配置文件打开❌"))
+            return
 
         data = pd.DataFrame()
         data.index = ['条件','UL烟雾-增量比值', 'UL烟雾-增量比值变化率', 'UL烟雾-计数', 'UL烟雾-PPM', 'UL烟雾-方差和平均值',
                       'PU烟雾-增量比值', 'PU烟雾-增量比值变化率', 'PU烟雾-计数', 'PU烟雾-PPM', 'PU烟雾-方差和平均值']
 
         #设备状态
-        device_states_index = 0
-        device_states_start = 12 + device_states_index * 3
+        states_index = 0
+        states_bit_start = 12 + states_index * 3
+        # A增量
+        increment_a_index = 17
+        increment_a_bit_start = 12 + increment_a_index * 3
+        # B增量
+        increment_b_index = 34
+        increment_b_bit_start = 12 + increment_b_index * 3
         # 增量比值
-        increment_ration = []
+        increment_ration_list = []
         increment_index = 36
         increment_bit_start = 12 + increment_index*3
         # 比值变化率
-        ration_of_change = []
+        ration_of_change_list = []
         ration_index = 38
         ration_bit_start = 12 + ration_index*3
         # 计数
-        rise_cnt = []
+        rise_cnt_list = []
         rise_index = 40
         rise_bit_start = 12 + rise_index*3
         # 均值
-        average_value = []
+        average_list = []
         average_index = 42
         average_bit_start = 12 + average_index*3
         # 方差
-        variance_value = []
+        variance_list = []
         variance_index = 44
         variance_bit_start = 12 + variance_index*3
         # ppm值
-        ppm_value = []
+        ppm_list = []
         ppm_index = 5
         ppm_bit_start = 12 + ppm_index*3
 
 
-
+        calc_flag = False
         alarm_flag = False
 
         for log_file in log_files:
@@ -226,20 +233,10 @@ class SelectDevice(QWidget):
                         sub_line = line.split("Receive: ", maxsplit=1)
                         sub_line = sub_line[1].replace('"','')
                         if len(sub_line) > 30:
-                            if (alarm_flag == False) and (int('0x' + sub_line[device_states_start:device_states_start+2], 16) == 0x07):
+                            if (alarm_flag == False) and (int('0x' + sub_line[states_bit_start:states_bit_start+2], 16)
+                                                                          == 0x07):
                                 alarm_flag = True
                                 print("报警了")
-                                print("增量比值: 均值", np.mean(increment_ration), "最大值:", np.max(increment_ration),
-                                      "最小值:", np.min(increment_ration))
-                                print("增量比值变化率: 均值", np.mean(ration_of_change),
-                                      "最大值:", np.max(ration_of_change), "最小值:",
-                                      np.min(ration_of_change))
-                                print("计数: 均值", np.mean(rise_cnt), "最大值:", np.max(rise_cnt),
-                                      "最小值:", np.min(rise_cnt))
-                                print("平均值: 均值", np.mean(average_value), "最大值:", np.max(average_value),
-                                      "最小值:", np.min(average_value))
-                                print("方差: 均值", np.mean(variance_value), "最大值:", np.max(variance_value),
-                                      "最小值:", np.min(variance_value))
                             # print("---------------------------------------")
                             # print("增量比值:", int('0x' + sub_line[increment_bit_start:increment_bit_start+2] +
                             #                             sub_line[increment_bit_start + 3:increment_bit_start + 5], 16))
@@ -254,18 +251,68 @@ class SelectDevice(QWidget):
                             # print("PPM:", int('0x' + sub_line[ppm_bit_start:ppm_bit_start+2] +
                             #                             sub_line[ppm_bit_start + 3:ppm_bit_start + 5], 16))
 
-                            increment_ration.append(int('0x' + sub_line[increment_bit_start:increment_bit_start+2] +
-                                                        sub_line[increment_bit_start + 3:increment_bit_start + 5], 16))
-                            ration_of_change.append(int('0x' + sub_line[ration_bit_start:ration_bit_start+2] +
-                                                        sub_line[ration_bit_start + 3:ration_bit_start + 5], 16))
-                            rise_cnt.append(int('0x' + sub_line[rise_bit_start:rise_bit_start+2] +
-                                                        sub_line[rise_bit_start + 3:rise_bit_start + 5], 16))
-                            average_value.append(int('0x' + sub_line[average_bit_start:average_bit_start+2] +
-                                                        sub_line[average_bit_start + 3:average_bit_start + 5], 16))
-                            variance_value.append(int('0x' + sub_line[variance_bit_start:variance_bit_start+2] +
-                                                        sub_line[variance_bit_start + 3:variance_bit_start + 5], 16))
-                            ppm_value.append(int('0x' + sub_line[ppm_bit_start:ppm_bit_start+2] +
-                                                        sub_line[ppm_bit_start + 3:ppm_bit_start + 5], 16))
+                            #增量比值
+                            increment_ration_value = int('0x' + sub_line[increment_bit_start:increment_bit_start+2] +
+                                                        sub_line[increment_bit_start + 3:increment_bit_start + 5], 16)
+                            #增量A
+                            increment_a_value = int('0x' + sub_line[increment_a_bit_start:increment_a_bit_start+2] +
+                                                    sub_line[increment_a_bit_start + 3:increment_a_bit_start + 5], 16)
+                            #增量B
+                            increment_b_value = int('0x' + sub_line[increment_b_bit_start:increment_b_bit_start+2] +
+                                                    sub_line[increment_b_bit_start + 3:increment_b_bit_start + 5], 16)
+                            #比值变化率，有符号
+                            byte_data = bytes.fromhex(sub_line[ration_bit_start:ration_bit_start+2] +
+                                                            sub_line[ration_bit_start + 3:ration_bit_start + 5])
+                            ration_of_change_value = int.from_bytes(byte_data, byteorder='big', signed=True)
+                            #计数
+                            rise_cnt_value = int('0x' + sub_line[rise_bit_start:rise_bit_start+2] +
+                                                            sub_line[rise_bit_start + 3:rise_bit_start + 5], 16)
+                            #均值，有符号
+                            byte_data = bytes.fromhex(sub_line[average_bit_start:average_bit_start+2] +
+                                                            sub_line[average_bit_start + 3:average_bit_start + 5])
+                            average_value = int.from_bytes(byte_data, byteorder='big', signed=True)
+
+                            #方差
+                            variance_value = int('0x' + sub_line[variance_bit_start:variance_bit_start+2] +
+                                                        sub_line[variance_bit_start + 3:variance_bit_start + 5], 16)
+                            #ppm值
+                            ppm_value = int('0x' + sub_line[ppm_bit_start:ppm_bit_start+2] +
+                                                            sub_line[ppm_bit_start + 3:ppm_bit_start + 5], 16)
+
+
+                            if increment_ration_value == 0 and calc_flag == True:
+                                calc_flag = False
+                                if len(increment_ration_list) > 2:
+                                    print("---------------------------------------")
+                                    print("增量比值: 均值", np.mean(increment_ration_list),
+                                          "最大值:", np.max(increment_ration_list), "最小值:", np.min(increment_ration_list))
+                                    print("比值变化率: 均值", np.mean(ration_of_change_list),
+                                          "最大值:", np.max(ration_of_change_list), "最小值:", np.min(ration_of_change_list))
+                                    print("计数: 均值", np.mean(rise_cnt_list), "最大值:", np.max(rise_cnt_list),
+                                          "最小值:", np.min(rise_cnt_list))
+                                    print("平均值: 均值", np.mean(average_list),"最大值:", np.max(average_list),
+                                          "最小值:", np.min(average_list))
+                                    print("方差: 均值", np.mean(variance_list), "最大值:", np.max(variance_list),
+                                          "最小值:", np.min(variance_list))
+                                    print("---------------------------------------")
+                                increment_ration_list.clear()
+                                ration_of_change_list.clear()
+                                rise_cnt_list.clear()
+                                average_list.clear()
+                                variance_list.clear()
+                                ppm_list.clear()
+                            elif increment_b_value > 200 or calc_flag == True:
+                                print("value:", increment_ration_value, increment_a_value, increment_b_value,
+                                      ration_of_change_value, rise_cnt_value, average_value, variance_value, ppm_value)
+                                if not calc_flag:
+                                    calc_flag = True
+                                else:#重置后第二次开始计算
+                                    increment_ration_list.append(increment_ration_value)
+                                    ration_of_change_list.append(ration_of_change_value)
+                                    rise_cnt_list.append(rise_cnt_value)
+                                    average_list.append(average_value)
+                                    variance_list.append(variance_value)
+                                    ppm_list.append(ppm_value)
 
 
         print("数据:",data)
