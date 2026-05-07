@@ -273,18 +273,63 @@ class SampleData(QWidget):
         self.text_edit.append(self.valid.format(f"添加绘图对象:{name}✅"))
         self.customPlot.add_graph(info['名称'], info['颜色'])
 
+    @staticmethod
+    def get_crc8(buf, length):
+        crc = 0
+        # 遍历缓冲区
+        for j in range(length):
+            byte_val = buf[j]
+
+            # 对应 C# 中的 for (i = 0x80; i != 0; i /= 2)
+            # 从高位到低位遍历每一位 (128, 64, 32...)
+            i = 0x80
+            while i != 0:
+                if (crc & 0x80) != 0:
+                    crc = (crc * 2) & 0xFF  # 左移一位，并强制保留8位
+                    crc ^= 0x07
+                else:
+                    crc = (crc * 2) & 0xFF  # 左移一位
+
+                if (byte_val & i) != 0:
+                    crc ^= 0x07
+
+                i //= 2  # 对应 C# 的 i /= 2
+
+        print("crc3:", crc)
+        return crc
+
+
     def serial_thread_receive_data_process(self, receive_data):
-        print('receive:', receive_data)
-        # print(self.list_graph_info)
+
+        test_1 = [0x01, 0x02, 0x03, 0x04]
+        print("test_1:", self.get_crc8(test_1, len(test_1)))
+
+        test_2 = [1, 2, 3, 4]
+        print("test_2:", self.get_crc8(test_2, len(test_2)))
+
         self.text_edit.append(receive_data)
         hex_str =  ''.join(f'{ord(c):02x}' for c in receive_data)
-        for info in self.list_graph_info:
-            char_index = 10 + int(info['偏移']) * 2
-            data_len = int(info['数据长度'])*2
-            target_hex = hex_str[char_index:char_index+data_len]
-            print(hex_str)
-            print(info['名称'], f"0x{target_hex}", char_index, data_len)
-            if target_hex:
-                decimal_value = int(target_hex, 16)
-                timestamp = time.time()
-                self.customPlot.add_data(info['名称'], timestamp, decimal_value)
+
+        print("crc0:", hex_str)
+        hex_array = list(bytes.fromhex(hex_str))
+        print("crc1:", hex_array)
+        crc_calc_array = []
+        if hex_array[0] == 0x5A and len(hex_array) > hex_array[1]:
+            temp_array = hex_array[0:(hex_array[1]+3)]
+            crc_calc_array = temp_array[2:len(temp_array)-1]
+            print("crc2:", temp_array)
+            print("crc3:", crc_calc_array)
+
+        # crc_data = crc_calc_array[len(hex_array)-1]
+        # print("crc3:", crc_data)
+
+        # if self.get_crc8(crc_calc_array, len(crc_calc_array)) == crc_data:                    #crc通过
+        #     for info in self.list_graph_info:
+        #         char_index = 5 + int(info['偏移'])
+        #         data_len = int(info['数据长度'])
+        #         target_hex = hex_array[char_index:char_index+data_len]
+        #         print(info['名称'], f"0x{target_hex}", char_index, data_len)
+                # if target_hex:
+                #     decimal_value = int(target_hex, 16)
+                #     timestamp = time.time()
+                #     self.customPlot.add_data(info['名称'], int(timestamp), decimal_value)

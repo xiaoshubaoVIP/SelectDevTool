@@ -174,11 +174,36 @@ class SelectDevice(QWidget):
         data.index = ['条件','UL烟雾-增量比值', 'UL烟雾-增量比值变化率', 'UL烟雾-计数', 'UL烟雾-PPM', 'UL烟雾-方差和平均值',
                       'PU烟雾-增量比值', 'PU烟雾-增量比值变化率', 'PU烟雾-计数', 'PU烟雾-PPM', 'PU烟雾-方差和平均值']
 
+        #设备状态
+        device_states_index = 0
+        device_states_start = 12 + device_states_index * 3
+        # 增量比值
         increment_ration = []
-        increment_ration_of_change = []
+        increment_index = 36
+        increment_bit_start = 12 + increment_index*3
+        # 比值变化率
+        ration_of_change = []
+        ration_index = 38
+        ration_bit_start = 12 + ration_index*3
+        # 计数
         rise_cnt = []
+        rise_index = 40
+        rise_bit_start = 12 + rise_index*3
+        # 均值
         average_value = []
+        average_index = 42
+        average_bit_start = 12 + average_index*3
+        # 方差
         variance_value = []
+        variance_index = 44
+        variance_bit_start = 12 + variance_index*3
+        # ppm值
+        ppm_value = []
+        ppm_index = 5
+        ppm_bit_start = 12 + ppm_index*3
+
+
+
         alarm_flag = False
 
         for log_file in log_files:
@@ -201,14 +226,14 @@ class SelectDevice(QWidget):
                         sub_line = line.split("Receive: ", maxsplit=1)
                         sub_line = sub_line[1].replace('"','')
                         if len(sub_line) > 30:
-                            if (alarm_flag == False) and (int('0x' + sub_line[13:15], 16) == 0x07):#报警后，结束计算
+                            if (alarm_flag == False) and (int('0x' + sub_line[device_states_start:device_states_start+2], 16) == 0x07):
                                 alarm_flag = True
                                 print("报警了")
                                 print("增量比值: 均值", np.mean(increment_ration), "最大值:", np.max(increment_ration),
                                       "最小值:", np.min(increment_ration))
-                                print("增量比值变化率: 均值", np.mean(increment_ration_of_change),
-                                      "最大值:", np.max(increment_ration_of_change), "最小值:",
-                                      np.min(increment_ration_of_change))
+                                print("增量比值变化率: 均值", np.mean(ration_of_change),
+                                      "最大值:", np.max(ration_of_change), "最小值:",
+                                      np.min(ration_of_change))
                                 print("计数: 均值", np.mean(rise_cnt), "最大值:", np.max(rise_cnt),
                                       "最小值:", np.min(rise_cnt))
                                 print("平均值: 均值", np.mean(average_value), "最大值:", np.max(average_value),
@@ -216,19 +241,31 @@ class SelectDevice(QWidget):
                                 print("方差: 均值", np.mean(variance_value), "最大值:", np.max(variance_value),
                                       "最小值:", np.min(variance_value))
                             # print("---------------------------------------")
-                            # print("报警增量电压:", sub_line[21:23], sub_line[24:26])#报警电压差值，#偏移量*3+12
-                            # print("增量比值:", sub_line[120:122], sub_line[123:125])#增量比值
-                            # print("增量比值变化率:", sub_line[126:128], sub_line[129:131])#增量比值变化率
-                            # print("计数:", sub_line[132:134], sub_line[135:137])#计数
-                            # print("平均值:", sub_line[138:140], sub_line[141:143])#平均值
-                            # print("方差:", sub_line[144:146], sub_line[147:149])#方差
+                            # print("增量比值:", int('0x' + sub_line[increment_bit_start:increment_bit_start+2] +
+                            #                             sub_line[increment_bit_start + 3:increment_bit_start + 5], 16))
+                            # print("比值变化率:", int('0x' + sub_line[ration_bit_start:ration_bit_start+2] +
+                            #                             sub_line[ration_bit_start + 3:ration_bit_start + 5], 16))
+                            # print("计数:", int('0x' + sub_line[rise_bit_start:rise_bit_start+2] +
+                            #                             sub_line[rise_bit_start + 3:rise_bit_start + 5], 16))
+                            # print("平均值:", int('0x' + sub_line[variance_bit_start:variance_bit_start+2] +
+                            #                             sub_line[variance_bit_start + 3:variance_bit_start + 5], 16))
+                            # print("方差:", int('0x' + sub_line[variance_bit_start:variance_bit_start+2] +
+                            #                             sub_line[variance_bit_start + 3:variance_bit_start + 5], 16))
+                            # print("PPM:", int('0x' + sub_line[ppm_bit_start:ppm_bit_start+2] +
+                            #                             sub_line[ppm_bit_start + 3:ppm_bit_start + 5], 16))
 
-                            increment_ration.append(int('0x' + sub_line[120:122] + sub_line[123:125], 16))
-                            increment_ration_of_change.append(int('0x' + sub_line[126:128] + sub_line[129:131], 16))
-                            rise_cnt.append(int('0x' + sub_line[132:134] + sub_line[135:137], 16))
-                            average_value.append(int('0x' + sub_line[138:140] + sub_line[141:143], 16))
-                            variance_value.append(int('0x' + sub_line[144:146] + sub_line[147:149], 16))
-
+                            increment_ration.append(int('0x' + sub_line[increment_bit_start:increment_bit_start+2] +
+                                                        sub_line[increment_bit_start + 3:increment_bit_start + 5], 16))
+                            ration_of_change.append(int('0x' + sub_line[ration_bit_start:ration_bit_start+2] +
+                                                        sub_line[ration_bit_start + 3:ration_bit_start + 5], 16))
+                            rise_cnt.append(int('0x' + sub_line[rise_bit_start:rise_bit_start+2] +
+                                                        sub_line[rise_bit_start + 3:rise_bit_start + 5], 16))
+                            average_value.append(int('0x' + sub_line[average_bit_start:average_bit_start+2] +
+                                                        sub_line[average_bit_start + 3:average_bit_start + 5], 16))
+                            variance_value.append(int('0x' + sub_line[variance_bit_start:variance_bit_start+2] +
+                                                        sub_line[variance_bit_start + 3:variance_bit_start + 5], 16))
+                            ppm_value.append(int('0x' + sub_line[ppm_bit_start:ppm_bit_start+2] +
+                                                        sub_line[ppm_bit_start + 3:ppm_bit_start + 5], 16))
 
 
         print("数据:",data)
