@@ -163,19 +163,20 @@ class SelectDevice(QWidget):
         try:
             set_data = pd.read_excel(self.set_file_path, sheet_name=sheet_name, dtype=str)  # 以字符串形式打开并读取excel表格
             set_data = pd.DataFrame(set_data)
-
-            #self.df['条件'] = set_data['条件']                  #沿用配置文件的行名
-            self.df = set_data[['条件', '最小值', '最大值']].copy()
-
             print(set_data)
+
             self.text_edit.append(self.valid.format(sheet_name+"配置文件打开✅"))
         except FileNotFoundError as e:
             self.text_edit.append(self.error.format(sheet_name+"配置文件打开❌"))
             return
 
         data = pd.DataFrame()
-        data.index = ['条件','UL烟雾-增量比值', 'UL烟雾-增量比值变化率', 'UL烟雾-计数', 'UL烟雾-PPM', 'UL烟雾-方差和平均值',
-                      'PU烟雾-增量比值', 'PU烟雾-增量比值变化率', 'PU烟雾-计数', 'PU烟雾-PPM', 'PU烟雾-方差和平均值']
+        #通过修改index属性更改行名称
+        data.index = ['编号','通用-A通道校机差值', '通用-B通道校机差值', '通用-B初始增量',
+            'UL烟雾-灵敏度', 'UL烟雾-增量比值', 'UL烟雾-比值变化率', 'UL烟雾-计数', 'UL烟雾-PPM', 'UL烟雾-平均值', 'UL烟雾-方差',
+            'PU烟雾-灵敏度', 'PU烟雾-增量比值', 'PU烟雾-比值变化率', 'PU烟雾-计数', 'PU烟雾-PPM', 'PU烟雾-平均值', 'PU烟雾-方差',
+            '油烟-增量比值', '油烟-比值变化率', '油烟-计数', '油烟-PPM', '油烟-平均值',  '油烟-方差', '油烟-结束时红光增量',
+            '混合烟-数组最小值', '混合烟-数组最大值', '混合烟-比值最小值', '混合烟-比值最大值']
 
         #设备状态
         states_index = 0
@@ -216,6 +217,9 @@ class SelectDevice(QWidget):
         alarm_flag = False
 
         dev_name = None
+        dev_column_min = None
+        dev_column_max = None
+        dev_column_mean = None
         test_name = None
 
         for log_file in log_files:
@@ -231,9 +235,9 @@ class SelectDevice(QWidget):
                         oil_test_keyword = ['烹饪', '油烟']
 
                         if any(k in line for k in smoke_box_keyword):
-                            test_name = "UL标准烟雾"
+                            test_name = "UL烟雾"
                         elif any(k in line for k in pu_test_keyword):
-                            test_name = "聚氨酯"
+                            test_name = "PU烟雾"
                         elif any(k in line for k in oil_test_keyword):
                             test_name = "油烟"
                         elif "混合烟" in line:
@@ -241,9 +245,13 @@ class SelectDevice(QWidget):
 
                         pattern1 = r'\d+\#'
                         dev_name = re.findall(pattern1, line)
-                        print("n:",dev_name)
                         if dev_name is not None:
-                            data.loc[:, dev_name] = 0
+                            dev_column_min = str(dev_name[0]) + '_min'
+                            dev_column_max = str(dev_name[0]) + '_max'
+                            dev_column_mean = str(dev_name[0]) + '_mean'
+                            data.loc[:, dev_column_min] = 0
+                            data.loc[:, dev_column_max] = 0
+                            data.loc[:, dev_column_mean] = 0
                             print("开始标记：", dev_name, f"({test_name})")
                     elif sub_string_end in line: #结束标记
                         # print(line.split(sub_string_end, maxsplit=1))
@@ -307,16 +315,49 @@ class SelectDevice(QWidget):
                                     print("---------------------------------------")
                                     print(dev_name)
                                     dev_name = None
-                                    print("增量比值: 均值", np.mean(increment_ration_list),
-                                          "最大值:", np.max(increment_ration_list), "最小值:", np.min(increment_ration_list))
-                                    print("比值变化率: 均值", np.mean(ration_of_change_list),
-                                          "最大值:", np.max(ration_of_change_list), "最小值:", np.min(ration_of_change_list))
-                                    print("计数: 均值", np.mean(rise_cnt_list), "最大值:", np.max(rise_cnt_list),
-                                          "最小值:", np.min(rise_cnt_list))
-                                    print("平均值: 均值", np.mean(average_list),"最大值:", np.max(average_list),
-                                          "最小值:", np.min(average_list))
-                                    print("方差: 均值", np.mean(variance_list), "最大值:", np.max(variance_list),
-                                          "最小值:", np.min(variance_list))
+                                    increment_ration_min = np.min(increment_ration_list)
+                                    increment_ration_max = np.max(increment_ration_list)
+                                    increment_ration_mean = int(np.mean(increment_ration_list))
+                                    print("增量比值: 均值", increment_ration_mean,
+                                          "最大值:", increment_ration_max, "最小值:", increment_ration_min)
+                                    data.loc[str(test_name) + '-增量比值',dev_column_min] = increment_ration_min
+                                    data.loc[str(test_name) + '-增量比值', dev_column_max] = increment_ration_max
+                                    data.loc[str(test_name) + '-增量比值', dev_column_mean] = increment_ration_mean
+
+                                    ration_of_change_min = np.min(ration_of_change_list)
+                                    ration_of_change_max = np.max(ration_of_change_list)
+                                    ration_of_change_mean = int(np.mean(ration_of_change_list))
+                                    print("比值变化率: 均值", ration_of_change_mean,
+                                          "最大值:", ration_of_change_max, "最小值:", ration_of_change_min)
+                                    data.loc[str(test_name) + '-比值变化率',dev_column_min] = ration_of_change_min
+                                    data.loc[str(test_name) + '-比值变化率', dev_column_max] = ration_of_change_max
+                                    data.loc[str(test_name) + '-比值变化率', dev_column_mean] = ration_of_change_mean
+
+
+                                    rise_cnt_min = np.min(rise_cnt_list)
+                                    rise_cnt_max = np.max(rise_cnt_list)
+                                    rise_cnt_mean = int(np.mean(rise_cnt_list))
+                                    print("计数: 均值", rise_cnt_mean, "最大值:", rise_cnt_max, "最小值:", rise_cnt_min)
+                                    data.loc[str(test_name) + '-计数',dev_column_min] = rise_cnt_min
+                                    data.loc[str(test_name) + '-计数', dev_column_max] = rise_cnt_max
+                                    data.loc[str(test_name) + '-计数', dev_column_mean] = rise_cnt_mean
+
+
+                                    average_min = np.min(average_list)
+                                    average_max = np.max(average_list)
+                                    average_mean = int(np.mean(average_list))
+                                    print("平均值: 均值", average_mean, "最大值:", average_max, "最小值:", average_min)
+                                    data.loc[str(test_name) + '-平均值',dev_column_min] = average_min
+                                    data.loc[str(test_name) + '-平均值', dev_column_max] = average_max
+                                    data.loc[str(test_name) + '-平均值', dev_column_mean] = average_mean
+
+                                    variance_min = np.min(variance_list)
+                                    variance_max = np.max(variance_list)
+                                    variance_mean = int(np.mean(variance_list))
+                                    print("方差: 均值", variance_mean, "最大值:", variance_max, "最小值:", variance_min)
+                                    data.loc[str(test_name) + '-方差',dev_column_min] = variance_min
+                                    data.loc[str(test_name) + '-方差', dev_column_max] = variance_max
+                                    data.loc[str(test_name) + '-方差', dev_column_mean] = variance_mean
                                     print("---------------------------------------")
                                 increment_ration_list.clear()
                                 ration_of_change_list.clear()
@@ -339,6 +380,7 @@ class SelectDevice(QWidget):
 
 
         print("数据:",data)
+        self.df = data
         self.show_save_dialog()
 
     def show_save_dialog(self):
@@ -373,6 +415,15 @@ class SelectDevice(QWidget):
     def save_file(self, save_file):
         try:
             print(self.df)
+            # 初始化 Workbook
+            wb = Workbook()
+            wb_s = wb.active
+
+            # 将 DataFrame 转换为行并写入工作表
+            for row in dataframe_to_rows(self.df, index=True, header=True):
+                wb_s.append(row)
+
+            wb.save(save_file)
             print("✅ 文件写入成功！")
         except Exception as e:
             print(f"❌ 写入失败，错误信息: {e}")
