@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from pathlib import Path
 
@@ -155,6 +156,7 @@ class SelectDevice(QWidget):
             else:
                 self.text_edit.append(self.error.format("未找到log文件❌"))
 
+
     def log_process(self, path, log_files):
         sheet_name = self.cb.currentText()
         print(sheet_name)
@@ -213,6 +215,9 @@ class SelectDevice(QWidget):
         calc_flag = False
         alarm_flag = False
 
+        dev_name = None
+        test_name = None
+
         for log_file in log_files:
             file_full_path = str(path + '/' + log_file)
             with open(file_full_path, "r", encoding="utf-8") as file:
@@ -221,15 +226,31 @@ class SelectDevice(QWidget):
                     sub_string_start = "Graph: mark start "
                     sub_string_end = "Graph: mark end "
                     if sub_string_start in line: #开始标记，获取设备编号
-                        sub_line = line.split(sub_string_start, maxsplit=1)
-                        sub_line = sub_line[1].replace('"','').split('-', maxsplit=1)
-                        dev_name = sub_line[0]
-                        data.loc[:, dev_name] = 0
-                        print(dev_name)
+                        smoke_box_keyword = ['标准烟雾', 'UL烟雾', '灵敏度', '烟箱']
+                        pu_test_keyword = ['PU', '聚氨酯', '海绵']
+                        oil_test_keyword = ['烹饪', '油烟']
+
+                        if any(k in line for k in smoke_box_keyword):
+                            test_name = "UL标准烟雾"
+                        elif any(k in line for k in pu_test_keyword):
+                            test_name = "聚氨酯"
+                        elif any(k in line for k in oil_test_keyword):
+                            test_name = "油烟"
+                        elif "混合烟" in line:
+                            test_name = "混合烟"
+
+                        pattern1 = r'\d+\#'
+                        dev_name = re.findall(pattern1, line)
+                        print("n:",dev_name)
+                        if dev_name is not None:
+                            data.loc[:, dev_name] = 0
+                            print("开始标记：", dev_name, f"({test_name})")
                     elif sub_string_end in line: #结束标记
                         # print(line.split(sub_string_end, maxsplit=1))
-                        print(dev_name+"测试结束")
-                    else:
+                        print("结束标记")
+                    elif dev_name is not None:
+                        if "Receive" not in line:
+                            continue
                         sub_line = line.split("Receive: ", maxsplit=1)
                         sub_line = sub_line[1].replace('"','')
                         if len(sub_line) > 30:
@@ -284,6 +305,8 @@ class SelectDevice(QWidget):
                                 calc_flag = False
                                 if len(increment_ration_list) > 2:
                                     print("---------------------------------------")
+                                    print(dev_name)
+                                    dev_name = None
                                     print("增量比值: 均值", np.mean(increment_ration_list),
                                           "最大值:", np.max(increment_ration_list), "最小值:", np.min(increment_ration_list))
                                     print("比值变化率: 均值", np.mean(ration_of_change_list),
