@@ -10,7 +10,7 @@ from PyQt5.QtCore import QDir, ws
 from PyQt5.QtWidgets import QWidget, QPushButton, QLineEdit, QTextEdit, QVBoxLayout, QHBoxLayout, QFileDialog, \
     QComboBox, QLabel
 from openpyxl import load_workbook, Workbook
-from openpyxl.styles import Alignment, Font, Border, Side
+from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
 from openpyxl.utils.dataframe import dataframe_to_rows
 
 class SelectDevice(QWidget):
@@ -387,11 +387,11 @@ class SelectDevice(QWidget):
         #获取当前时间作为文件名
         timestamp = time.time()
         local_time = time.localtime(timestamp)
-        formatted_time = time.strftime('%Y-%m-%d_%H%M%S', local_time)
+        formatted_time = time.strftime('%Y-%m-%d_%H-%M-%S', local_time)
 
         # 使用 os.path.normpath 规范化路径，避免非法字符
         default_dir = os.path.normpath(QtCore.QDir.currentPath() + '/output/')
-        default_file = self.cb.currentText() + formatted_time + '.xlsx'
+        default_file = self.cb.currentText() +'_' + formatted_time + '.xlsx'
         full_path = os.path.join(default_dir, default_file)  # 使用 os.path.join 处理路径分隔符
 
         print("保存路径:", default_dir)
@@ -430,6 +430,9 @@ class SelectDevice(QWidget):
                                  right=Side(style='thin'),
                                  top=Side(style='thin'),
                                  bottom=Side(style='thin'))
+            # 填充色
+            fill_header = PatternFill(start_color='0C9C0C', end_color='0C9C0C', fill_type='solid')
+            fill_child_header = PatternFill(start_color='DDD9C4', end_color='DDD9C4', fill_type='solid')
 
             # 1. 需要先写入值
             rows = dataframe_to_rows(self.df, index=True, header=True)
@@ -446,15 +449,19 @@ class SelectDevice(QWidget):
                                 cell.alignment = align_center
                                 cell.font = font_header
                                 cell.border = thin_border
+                                cell.fill = fill_header
                 elif r_idx == 2:
                     for c_idx in range(0, len(columns_list), 3):#for in循环， 起始值、终止值和步长
                         print("c_idx", c_idx, len(columns_list))
                         cell = wb_s.cell(row=2, column=c_idx + 2, value='最小值')
                         cell.border = thin_border
+                        cell.fill = fill_child_header
                         cell = wb_s.cell(row=2, column=c_idx + 3, value='最大值')
                         cell.border = thin_border
+                        cell.fill = fill_child_header
                         cell = wb_s.cell(row=2, column=c_idx + 4, value='平均值')
                         cell.border = thin_border
+                        cell.fill = fill_child_header
                 else:
                     for c_idx, value in enumerate(row, 1):
                         # 直接通过单元格坐标写入，而不是 append
@@ -473,9 +480,10 @@ class SelectDevice(QWidget):
 
             # 3. 合并显示设备号
             wb_s.merge_cells('A1:A2')
-            wb_s['A1'] = '编号'
+            wb_s['A1'] = '设备号'
             cell = wb_s['A1']
             cell.alignment = Alignment(horizontal='left', vertical='center')
+            cell.fill = PatternFill(start_color='C5D9F1', end_color='C5D9F1', fill_type='solid')
 
             # 4. 设置首列A的宽度
             wb_s.column_dimensions['A'].width = 24
@@ -489,4 +497,12 @@ class SelectDevice(QWidget):
             self.text_edit.append(self.error.format("写入excel失败，确保文件在关闭状态❌"))
 
         # 请求完成
+        file_name = os.path.basename(save_file)
+        print("文件名",file_name)  # 输出: file.txt
         self.text_edit.append(self.valid.format("刷选完成✅ "))
+        self.text_edit.append(self.valid.format(f"输出文件:{file_name}✅ "))
+        try:
+            os.startfile(save_file)  # Windows系统可用
+        except Exception as e:
+            print(f"❌ 打开excel失败: {e}")
+            self.text_edit.append(self.error.format("打开excel失败❌"))
