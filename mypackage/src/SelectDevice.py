@@ -10,8 +10,8 @@ from PyQt5.QtCore import QDir, ws
 from PyQt5.QtWidgets import QWidget, QPushButton, QLineEdit, QTextEdit, QVBoxLayout, QHBoxLayout, QFileDialog, \
     QComboBox, QLabel
 from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Alignment, Font, Border, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
-
 
 class SelectDevice(QWidget):
     def __init__(self):
@@ -418,12 +418,18 @@ class SelectDevice(QWidget):
             # 初始化 Workbook
             wb = Workbook()
             wb_s = wb.active
-
-            # 将 DataFrame 转换为行并写入工作表
-            # for row in dataframe_to_rows(self.df, index=True, header=True):
-            #     wb_s.append(row)
-
             columns_list = self.df.columns.to_list()
+
+            # --- 样式定义 ---
+            # 居中：水平居中，垂直居中
+            align_center = Alignment(horizontal='center', vertical='center')
+            # 字体：宋体，11号，加粗
+            font_header = Font(name='宋体', size=14, bold=True)
+            # 边框（可选，通常表头加个边框更好看）
+            thin_border = Border(left=Side(style='thin'),
+                                 right=Side(style='thin'),
+                                 top=Side(style='thin'),
+                                 bottom=Side(style='thin'))
 
             # 1. 需要先写入值
             rows = dataframe_to_rows(self.df, index=True, header=True)
@@ -436,16 +442,29 @@ class SelectDevice(QWidget):
                             match = re.search(pattern, str(columns_list[c_idx - 2]))  # 使用 search 更稳妥，或者确保 findall 有结果
                             if match:
                                 wb_s.cell(row=1, column=c_idx, value=match.group(0))
+                                cell = wb_s.cell(row=1, column=c_idx)   #写入数据时，同时设置单元格样式
+                                cell.alignment = align_center
+                                cell.font = font_header
+                                cell.border = thin_border
                 elif r_idx == 2:
                     for c_idx in range(0, len(columns_list), 3):#for in循环， 起始值、终止值和步长
                         print("c_idx", c_idx, len(columns_list))
-                        wb_s.cell(row=2, column=c_idx + 2, value='最小值')
-                        wb_s.cell(row=2, column=c_idx + 3, value='最大值')
-                        wb_s.cell(row=2, column=c_idx + 4, value='平均值')
+                        cell = wb_s.cell(row=2, column=c_idx + 2, value='最小值')
+                        cell.border = thin_border
+                        cell = wb_s.cell(row=2, column=c_idx + 3, value='最大值')
+                        cell.border = thin_border
+                        cell = wb_s.cell(row=2, column=c_idx + 4, value='平均值')
+                        cell.border = thin_border
                 else:
                     for c_idx, value in enumerate(row, 1):
                         # 直接通过单元格坐标写入，而不是 append
                         wb_s.cell(row=r_idx, column=c_idx, value=value)
+                        if c_idx > 1 and (c_idx-2)%3 == 0:
+                            cell = wb_s.cell(row=r_idx, column=c_idx)
+                            cell.border = Border(left=Side(style='thin'), right=None, top=None, bottom=None)
+                    # for c_idx in range(0, len(columns_list), 3):  # for in循环， 起始值、终止值和步长,2 5 8 11
+                    #     cell = wb_s.cell(row=r_idx, column=c_idx + 2)
+                    #     cell.border = Border(left=Side(style='thin'), right=None, top=None, bottom=None)
 
             # 2. 必须执行1写入后，才能合并单元格，写入设备名称
             columns_array = columns_list[::3]
@@ -455,6 +474,11 @@ class SelectDevice(QWidget):
             # 3. 合并显示设备号
             wb_s.merge_cells('A1:A2')
             wb_s['A1'] = '编号'
+            cell = wb_s['A1']
+            cell.alignment = Alignment(horizontal='left', vertical='center')
+
+            # 4. 设置首列A的宽度
+            wb_s.column_dimensions['A'].width = 24
 
             wb.save(save_file)
             wb.close()
