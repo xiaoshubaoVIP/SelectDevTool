@@ -172,7 +172,7 @@ class SelectDevice(QWidget):
 
         data = pd.DataFrame()
         #通过修改index属性更改行名称
-        data.index = ['编号','通用-A通道校机差值', '通用-B通道校机差值', '通用-B初始增量',
+        data.index = ['通用-A通道校机差值', '通用-B通道校机差值', '通用-B初始增量',
             'UL烟雾-灵敏度', 'UL烟雾-增量比值', 'UL烟雾-比值变化率', 'UL烟雾-计数', 'UL烟雾-PPM', 'UL烟雾-平均值', 'UL烟雾-方差',
             'PU烟雾-灵敏度', 'PU烟雾-增量比值', 'PU烟雾-比值变化率', 'PU烟雾-计数', 'PU烟雾-PPM', 'PU烟雾-平均值', 'PU烟雾-方差',
             '油烟-增量比值', '油烟-比值变化率', '油烟-计数', '油烟-PPM', '油烟-平均值',  '油烟-方差', '油烟-结束时红光增量',
@@ -420,11 +420,46 @@ class SelectDevice(QWidget):
             wb_s = wb.active
 
             # 将 DataFrame 转换为行并写入工作表
-            for row in dataframe_to_rows(self.df, index=True, header=True):
-                wb_s.append(row)
+            # for row in dataframe_to_rows(self.df, index=True, header=True):
+            #     wb_s.append(row)
+
+            columns_list = self.df.columns.to_list()
+
+            # 1. 需要先写入值
+            rows = dataframe_to_rows(self.df, index=True, header=True)
+            for r_idx, row in enumerate(rows, 1):  # 从第1行开始计数
+                if r_idx == 1:
+                    for c_idx in range(0, len(columns_list)):
+                        if c_idx > 1:
+                            print("c_idx", c_idx, len(columns_list))
+                            pattern = r'\d+\#'
+                            match = re.search(pattern, str(columns_list[c_idx - 2]))  # 使用 search 更稳妥，或者确保 findall 有结果
+                            if match:
+                                wb_s.cell(row=1, column=c_idx, value=match.group(0))
+                elif r_idx == 2:
+                    for c_idx in range(0, len(columns_list), 3):#for in循环， 起始值、终止值和步长
+                        print("c_idx", c_idx, len(columns_list))
+                        wb_s.cell(row=2, column=c_idx + 2, value='最小值')
+                        wb_s.cell(row=2, column=c_idx + 3, value='最大值')
+                        wb_s.cell(row=2, column=c_idx + 4, value='平均值')
+                else:
+                    for c_idx, value in enumerate(row, 1):
+                        # 直接通过单元格坐标写入，而不是 append
+                        wb_s.cell(row=r_idx, column=c_idx, value=value)
+
+            # 2. 必须执行1写入后，才能合并单元格，写入设备名称
+            columns_array = columns_list[::3]
+            for index in range(len(columns_array)):
+                    wb_s.merge_cells(None, 1, index*3+2, 1, index*3+4)
+
+            # 3. 合并显示设备号
+            wb_s.merge_cells('A1:A2')
+            wb_s['A1'] = '编号'
 
             wb.save(save_file)
+            wb.close()
             print("✅ 文件写入成功！")
+            print(self.df)
         except Exception as e:
             print(f"❌ 写入失败，错误信息: {e}")
             self.text_edit.append(self.error.format("写入excel失败，确保文件在关闭状态❌"))
