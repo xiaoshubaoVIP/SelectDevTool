@@ -19,7 +19,7 @@ class SelectDevice(QWidget):
         self.error = '<font color="red">{}</font>'
         self.warning = '<font color="orange">{}</font>'
         self.valid = '<font color="green">{}</font>'
-
+        self.normal = '<font color="black">{}</font>'
         #设置文件
         self.set_file_path = None
 
@@ -327,7 +327,7 @@ class SelectDevice(QWidget):
                                 if len(increment_ration_list) > 2:
                                     print("---------------------------------------")
                                     print(dev_name)
-                                    dev_name = None
+                                    dev_name_num = str(dev_name[0])
                                     if len(increment_ration_list) !=0:
                                         increment_ration_min = np.min(increment_ration_list)
                                         increment_ration_max = np.max(increment_ration_list)
@@ -348,11 +348,21 @@ class SelectDevice(QWidget):
                                                                             str(test_type), '最小值'].values[0]
                                                 max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                             str(test_type), '最大值'].values[0]
-                                                if int(min_value) < increment_ration_min and \
-                                                                            increment_ration_max < int(max_value):
-                                                    print('[✅]', test_type + ':', min_value, '~', max_value)
+                                                if int(min_value) > increment_ration_min:
+                                                    print(f'[❌][{dev_name_num}]', test_type + ':最小值',
+                                                          increment_ration_min, f'[{min_value}', '~', f'{max_value}]')
+                                                    self.text_edit.append(f'[{dev_name_num}]'+
+                                                        f'{test_type}:最小值='+f'{increment_ration_min}'+
+                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                                elif int(max_value) < increment_ration_max:
+                                                    print(f'[❌][{dev_name_num}]', test_type + ':最大值',
+                                                          increment_ration_max, f'[{min_value}', '~', f'{max_value}]')
+                                                    self.text_edit.append(f'[{dev_name_num}]'+
+                                                        f'{test_type}:最大值='+f'{increment_ration_max}'+
+                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                                 else:
-                                                    print('[❌]', test_type + ':', min_value, '~', max_value)
+                                                    print('[✅]', test_type + ':', f'[{min_value}', '~',
+                                                          f'{max_value}]')
 
                                     if len(ration_of_change_list) != 0:
                                         ration_of_change_min = np.min(ration_of_change_list)
@@ -374,11 +384,21 @@ class SelectDevice(QWidget):
                                                                             str(test_type), '最小值'].values[0]
                                                 max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                             str(test_type), '最大值'].values[0]
-                                                if int(min_value) < ration_of_change_min and \
-                                                                                ration_of_change_max < int(max_value):
-                                                    print('[✅]', test_type + ':', min_value, '~', max_value)
+                                                if int(min_value) > ration_of_change_min:
+                                                    print(f'[❌][{dev_name_num}]', test_type + ':最小值',
+                                                          ration_of_change_min, f'[{min_value}', '~', f'{max_value}]')
+                                                    self.text_edit.append(f'[{dev_name_num}]'+
+                                                        f'{test_type}:最小值='+f'{ration_of_change_min}'+
+                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                                elif int(max_value) < ration_of_change_max:
+                                                    print(f'[❌][{dev_name_num}]', test_type + ':最大值',
+                                                          ration_of_change_max, f'[{min_value}', '~', f'{max_value}]')
+                                                    self.text_edit.append(f'[{dev_name_num}]'+
+                                                        f'{test_type}:最大值='+f'{ration_of_change_max}'+
+                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                                 else:
-                                                    print('[❌]', test_type + ':', min_value, '~', max_value)
+                                                    print('[✅]', test_type + ':', f'[{min_value}', '~',
+                                                          f'{max_value}]')
 
                                     if len(rise_cnt_list) != 0:
                                         rise_cnt_min = np.min(rise_cnt_list)
@@ -399,10 +419,21 @@ class SelectDevice(QWidget):
                                                                             str(test_type), '最小值'].values[0]
                                                 max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                             str(test_type), '最大值'].values[0]
-                                                if int(min_value) < rise_cnt_min and rise_cnt_max < int(max_value):
-                                                    print('[✅]', test_type+':', min_value, '~',max_value)
+                                                if int(min_value) > rise_cnt_min:
+                                                    print(f'[❌][{dev_name_num}]', test_type + ':最小值', rise_cnt_min,
+                                                          f'[{min_value}', '~', f'{max_value}]')
+                                                    self.text_edit.append(f'[{dev_name_num}]'+
+                                                        f'{test_type}:最小值='+f'{rise_cnt_min}'+
+                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                                elif int(max_value) < rise_cnt_max:
+                                                    print(f'[❌][{dev_name_num}]', test_type + ':最大值', rise_cnt_max,
+                                                          f'[{min_value}', '~', f'{max_value}]')
+                                                    self.text_edit.append(f'[{dev_name_num}]'+
+                                                        f'{test_type}:最大值='+f'{rise_cnt_max}'+
+                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                                 else:
-                                                    print('[❌]', test_type+':', min_value, '~',max_value)
+                                                    print('[✅]', test_type + ':', f'[{min_value}', '~',
+                                                          f'{max_value}]')
 
 
                                     if len(average_list) != 0:
@@ -424,10 +455,21 @@ class SelectDevice(QWidget):
                                                                             str(test_type), '最小值'].values[0]
                                                 max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                             str(test_type), '最大值'].values[0]
-                                                if int(min_value) < average_min and average_max < int(max_value):
-                                                    print('[✅]', test_type + ':', min_value, '~', max_value)
+                                                if int(min_value) > average_min:
+                                                    print(f'[❌][{dev_name_num}]', test_type + ':最小值', average_min,
+                                                          f'[{min_value}', '~', f'{max_value}]')
+                                                    self.text_edit.append(f'[{dev_name_num}]'+
+                                                        f'{test_type}:最小值='+f'{average_min}'+
+                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                                elif int(max_value) < average_max:
+                                                    print(f'[❌][{dev_name_num}]', test_type + ':最大值', average_max,
+                                                          f'[{min_value}', '~', f'{max_value}]')
+                                                    self.text_edit.append(f'[{dev_name_num}]'+
+                                                        f'{test_type}:最大值='+f'{average_max}'+
+                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                                 else:
-                                                    print('[❌]', test_type + ':', min_value, '~', max_value)
+                                                    print('[✅]', test_type + ':', f'[{min_value}', '~',
+                                                          f'{max_value}]')
 
                                     if len(variance_list) != 0:
                                         variance_min = np.min(variance_list)
@@ -448,10 +490,21 @@ class SelectDevice(QWidget):
                                                                             str(test_type), '最小值'].values[0]
                                                 max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                             str(test_type), '最大值'].values[0]
-                                                if int(min_value) < variance_min and variance_max < int(max_value):
-                                                    print('[✅]', test_type + ':', min_value, '~', max_value)
+                                                if int(min_value) > variance_min:
+                                                    print(f'[❌][{dev_name_num}]', test_type + ':最小值', variance_min,
+                                                          f'[{min_value}', '~', f'{max_value}]')
+                                                    self.text_edit.append(f'[{dev_name_num}]'+
+                                                        f'{test_type}:最小值='+f'{variance_min}'+
+                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                                elif int(max_value) < variance_max:
+                                                    print(f'[❌][{dev_name_num}]', test_type + ':最大值', variance_max,
+                                                          f'[{min_value}', '~', f'{max_value}]')
+                                                    self.text_edit.append(f'[{dev_name_num}]' +
+                                                          f'{test_type}:最大值=' + f'{variance_max}' +
+                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                                 else:
-                                                    print('[❌]', test_type + ':', min_value, '~', max_value)
+                                                    print('[✅]', test_type + ':', f'[{min_value}', '~',
+                                                          f'{max_value}]')
 
                                     #校验L-D(A)
                                     print("通用-A通道校机差值:", cali_value_a)
@@ -468,9 +521,14 @@ class SelectDevice(QWidget):
                                             max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                         str(test_type), '最大值'].values[0]
                                             if int(min_value)  < cali_value_a < int(max_value):
-                                                print('[✅]', test_type+':', min_value, '~',max_value)
+                                                print('[✅]', test_type + ':', cali_value_a, f'[{min_value}', '~',
+                                                      f'{max_value}]')
                                             else:
-                                                print('[❌]', test_type+':', min_value, '~',max_value)
+                                                print(f'[❌][{dev_name_num}]', test_type + ':', cali_value_a,
+                                                                            f'[{min_value}', '~', f'{max_value}]')
+                                                self.text_edit.append(f'[{dev_name_num}]' +
+                                                                      f'{test_type}:=' + f'{cali_value_a}' +
+                                                                      f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
 
                                     #校验L-D(B)
                                     print("通用-B通道校机差值:", cali_value_b)
@@ -487,9 +545,14 @@ class SelectDevice(QWidget):
                                             max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                         str(test_type), '最大值'].values[0]
                                             if int(min_value)  < cali_value_b < int(max_value):
-                                                print('[✅]', test_type + ':', min_value, '~', max_value)
+                                                print('[✅]', test_type + ':', cali_value_b, f'[{min_value}', '~',
+                                                      f'{max_value}]')
                                             else:
-                                                print('[❌]', test_type + ':', min_value, '~', max_value)
+                                                print(f'[❌][{dev_name_num}]', test_type + ':', cali_value_b,
+                                                                            f'[{min_value}', '~', f'{max_value}]')
+                                                self.text_edit.append(f'[{dev_name_num}]' +
+                                                                      f'{test_type}:=' + f'{cali_value_b}' +
+                                                                      f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
 
                                     #初始增量(B)
                                     test_type = '通用-B通道初始增量'
@@ -505,11 +568,17 @@ class SelectDevice(QWidget):
                                             max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                         str(test_type), '最大值'].values[0]
                                             if int(min_value) < init_increment_b_value < int(max_value):
-                                                print('[✅]', test_type + ':', min_value, '~', max_value)
+                                                print('[✅]', test_type + ':', init_increment_b_value,
+                                                      f'[{min_value}', '~', f'{max_value}]')
                                             else:
-                                                print('[❌]', test_type + ':', min_value, '~', max_value)
+                                                print(f'[❌][{dev_name_num}]', test_type + ':', init_increment_b_value,
+                                                                            f'[{min_value}', '~', f'{max_value}]')
+                                                self.text_edit.append(f'[{dev_name_num}]' +
+                                                                      f'{test_type}:=' + f'{init_increment_b_value}' +
+                                                                      f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                     print("---------------------------------------")
 
+                                dev_name = None
                                 increment_ration_list.clear()
                                 ration_of_change_list.clear()
                                 rise_cnt_list.clear()
