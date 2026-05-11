@@ -211,10 +211,20 @@ class SelectDevice(QWidget):
         ppm_list = []
         ppm_index = 5
         ppm_bit_start = 12 + ppm_index*3
-
+        # 校验差值A，旧串口协议，s值 - 报警阈值(仅未识别烟雾类型前有效)
+        s_value_index_a = 9
+        s_value_a_bit_start = 12 + s_value_index_a * 3
+        alarm_level_index_a = 3
+        alarm_level_a_bit_start = 12 + alarm_level_index_a * 3
+        # 校验差值B，旧串口协议，s值 - 报警阈值(仅未识别烟雾类型前有效)
+        s_value_index_b = 26
+        s_value_b_bit_start = 12 + s_value_index_b * 3
+        alarm_level_index_b = 20
+        alarm_level_b_bit_start = 12 + alarm_level_index_b * 3
 
         calc_flag = False
         alarm_flag = False
+        start_mark_flag = False
 
         dev_name = None
         dev_column_min = None
@@ -242,10 +252,13 @@ class SelectDevice(QWidget):
                             test_name = "油烟"
                         elif "混合烟" in line:
                             test_name = "混合烟"
+                        else:
+                            test_name = "Null"
 
                         pattern1 = r'\d+\#'
                         dev_name = re.findall(pattern1, line)
                         if dev_name is not None:
+                            start_mark_flag = True
                             dev_column_min = str(dev_name[0]) + '_min'
                             dev_column_max = str(dev_name[0]) + '_max'
                             dev_column_mean = str(dev_name[0]) + '_mean'
@@ -308,7 +321,7 @@ class SelectDevice(QWidget):
                             ppm_value = int('0x' + sub_line[ppm_bit_start:ppm_bit_start+2] +
                                                             sub_line[ppm_bit_start + 3:ppm_bit_start + 5], 16)
 
-
+                            #如果增量比值=0，且校验开启标准=True，则结束计算
                             if increment_ration_value == 0 and calc_flag == True:
                                 calc_flag = False
                                 if len(increment_ration_list) > 2:
@@ -333,7 +346,6 @@ class SelectDevice(QWidget):
                                     data.loc[str(test_name) + '-比值变化率', dev_column_max] = ration_of_change_max
                                     data.loc[str(test_name) + '-比值变化率', dev_column_mean] = ration_of_change_mean
 
-
                                     rise_cnt_min = np.min(rise_cnt_list)
                                     rise_cnt_max = np.max(rise_cnt_list)
                                     rise_cnt_mean = int(np.mean(rise_cnt_list))
@@ -341,7 +353,6 @@ class SelectDevice(QWidget):
                                     data.loc[str(test_name) + '-计数',dev_column_min] = rise_cnt_min
                                     data.loc[str(test_name) + '-计数', dev_column_max] = rise_cnt_max
                                     data.loc[str(test_name) + '-计数', dev_column_mean] = rise_cnt_mean
-
 
                                     average_min = np.min(average_list)
                                     average_max = np.max(average_list)
@@ -358,6 +369,14 @@ class SelectDevice(QWidget):
                                     data.loc[str(test_name) + '-方差',dev_column_min] = variance_min
                                     data.loc[str(test_name) + '-方差', dev_column_max] = variance_max
                                     data.loc[str(test_name) + '-方差', dev_column_mean] = variance_mean
+
+                                    #校验L-D(A)
+                                    print("通用-A通道校机差值:", cali_value_a)
+                                    data.loc['通用-A通道校机差值', dev_column_mean] = cali_value_a
+
+                                    #校验L-D(B)
+                                    print("通用-B通道校机差值:", cali_value_b)
+                                    data.loc['通用-B通道校机差值', dev_column_mean] = cali_value_b
                                     print("---------------------------------------")
                                 increment_ration_list.clear()
                                 ration_of_change_list.clear()
@@ -365,18 +384,40 @@ class SelectDevice(QWidget):
                                 average_list.clear()
                                 variance_list.clear()
                                 ppm_list.clear()
+                            # 如果b通道增量>200，或者，校验开启标准=True，一直解析数据
                             elif increment_b_value > 200 or calc_flag == True:
-                                print("value:", increment_ration_value, increment_a_value, increment_b_value,
-                                      ration_of_change_value, rise_cnt_value, average_value, variance_value, ppm_value)
                                 if not calc_flag:
                                     calc_flag = True
+                                    # 校机L-D差值(A)
+                                    s_value_a = int('0x' + sub_line[s_value_a_bit_start:s_value_a_bit_start + 2] +
+                                                    sub_line[s_value_a_bit_start + 3:s_value_a_bit_start + 5], 16)
+                                    alarm_level_a = int(
+                                        '0x' + sub_line[alarm_level_a_bit_start:alarm_level_a_bit_start + 2] +
+                                        sub_line[alarm_level_a_bit_start + 3:alarm_level_a_bit_start + 5], 16)
+                                    cali_value_a = s_value_a - alarm_level_a
+
+                                    # 校机L-D差值(B)
+                                    s_value_b = int('0x' + sub_line[s_value_b_bit_start:s_value_b_bit_start + 2] +
+                                                    sub_line[s_value_b_bit_start + 3:s_value_b_bit_start + 5], 16)
+                                    alarm_level_b = int(
+                                        '0x' + sub_line[alarm_level_b_bit_start:alarm_level_b_bit_start + 2] +
+                                        sub_line[alarm_level_b_bit_start + 3:alarm_level_b_bit_start + 5], 16)
+                                    cali_value_b = s_value_b - alarm_level_b
+                                    print("cali_L-D(A)", cali_value_a, "cali_L-D(B)", cali_value_b)
                                 else:#重置后第二次开始计算
+                                    print("value:", increment_ration_value, increment_a_value, increment_b_value,
+                                          ration_of_change_value, rise_cnt_value, average_value, variance_value,
+                                          ppm_value)
                                     increment_ration_list.append(increment_ration_value)
                                     ration_of_change_list.append(ration_of_change_value)
                                     rise_cnt_list.append(rise_cnt_value)
                                     average_list.append(average_value)
                                     variance_list.append(variance_value)
                                     ppm_list.append(ppm_value)
+                            elif start_mark_flag:
+                                start_mark_flag = False
+                                print("init increment_b_value=", increment_b_value)
+                                data.loc['通用-B初始增量', dev_column_mean] = increment_b_value
 
 
         print("数据:",data)
