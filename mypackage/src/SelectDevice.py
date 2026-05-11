@@ -328,47 +328,52 @@ class SelectDevice(QWidget):
                                     print("---------------------------------------")
                                     print(dev_name)
                                     dev_name = None
-                                    increment_ration_min = np.min(increment_ration_list)
-                                    increment_ration_max = np.max(increment_ration_list)
-                                    increment_ration_mean = int(np.mean(increment_ration_list))
-                                    print("增量比值: 均值", increment_ration_mean,
-                                          "最大值:", increment_ration_max, "最小值:", increment_ration_min)
-                                    data.loc[str(test_name) + '-增量比值',dev_column_min] = increment_ration_min
-                                    data.loc[str(test_name) + '-增量比值', dev_column_max] = increment_ration_max
-                                    data.loc[str(test_name) + '-增量比值', dev_column_mean] = increment_ration_mean
+                                    if len(increment_ration_list) !=0:
+                                        increment_ration_min = np.min(increment_ration_list, initial=0)
+                                        increment_ration_max = np.max(increment_ration_list, initial=0)
+                                        increment_ration_mean = int(np.mean(increment_ration_list))
+                                        print("增量比值: 均值", increment_ration_mean,
+                                              "最大值:", increment_ration_max, "最小值:", increment_ration_min)
+                                        data.loc[str(test_name) + '-增量比值',dev_column_min] = increment_ration_min
+                                        data.loc[str(test_name) + '-增量比值', dev_column_max] = increment_ration_max
+                                        data.loc[str(test_name) + '-增量比值', dev_column_mean] = increment_ration_mean
 
-                                    ration_of_change_min = np.min(ration_of_change_list)
-                                    ration_of_change_max = np.max(ration_of_change_list)
-                                    ration_of_change_mean = int(np.mean(ration_of_change_list))
-                                    print("比值变化率: 均值", ration_of_change_mean,
-                                          "最大值:", ration_of_change_max, "最小值:", ration_of_change_min)
-                                    data.loc[str(test_name) + '-比值变化率',dev_column_min] = ration_of_change_min
-                                    data.loc[str(test_name) + '-比值变化率', dev_column_max] = ration_of_change_max
-                                    data.loc[str(test_name) + '-比值变化率', dev_column_mean] = ration_of_change_mean
+                                    if len(ration_of_change_list) != 0:
+                                        ration_of_change_min = np.min(ration_of_change_list, initial=0)
+                                        ration_of_change_max = np.max(ration_of_change_list, initial=0)
+                                        ration_of_change_mean = int(np.mean(ration_of_change_list))
+                                        print("比值变化率: 均值", ration_of_change_mean,
+                                              "最大值:", ration_of_change_max, "最小值:", ration_of_change_min)
+                                        data.loc[str(test_name) + '-比值变化率',dev_column_min] = ration_of_change_min
+                                        data.loc[str(test_name) + '-比值变化率', dev_column_max] = ration_of_change_max
+                                        data.loc[str(test_name) + '-比值变化率', dev_column_mean] = ration_of_change_mean
 
-                                    rise_cnt_min = np.min(rise_cnt_list)
-                                    rise_cnt_max = np.max(rise_cnt_list)
-                                    rise_cnt_mean = int(np.mean(rise_cnt_list))
-                                    print("计数: 均值", rise_cnt_mean, "最大值:", rise_cnt_max, "最小值:", rise_cnt_min)
-                                    data.loc[str(test_name) + '-计数',dev_column_min] = rise_cnt_min
-                                    data.loc[str(test_name) + '-计数', dev_column_max] = rise_cnt_max
-                                    data.loc[str(test_name) + '-计数', dev_column_mean] = rise_cnt_mean
+                                    if len(rise_cnt_list) != 0:
+                                        rise_cnt_min = np.min(rise_cnt_list, initial=0)
+                                        rise_cnt_max = np.max(rise_cnt_list, initial=0)
+                                        rise_cnt_mean = int(np.mean(rise_cnt_list))
+                                        print("计数: 均值", rise_cnt_mean, "最大值:", rise_cnt_max, "最小值:", rise_cnt_min)
+                                        data.loc[str(test_name) + '-计数',dev_column_min] = rise_cnt_min
+                                        data.loc[str(test_name) + '-计数', dev_column_max] = rise_cnt_max
+                                        data.loc[str(test_name) + '-计数', dev_column_mean] = rise_cnt_mean
 
-                                    average_min = np.min(average_list)
-                                    average_max = np.max(average_list)
-                                    average_mean = int(np.mean(average_list))
-                                    print("平均值: 均值", average_mean, "最大值:", average_max, "最小值:", average_min)
-                                    data.loc[str(test_name) + '-平均值',dev_column_min] = average_min
-                                    data.loc[str(test_name) + '-平均值', dev_column_max] = average_max
-                                    data.loc[str(test_name) + '-平均值', dev_column_mean] = average_mean
+                                    if len(average_list) != 0:
+                                        average_min = np.min(average_list, initial=0)
+                                        average_max = np.max(average_list, initial=0)
+                                        average_mean = int(np.mean(average_list))
+                                        print("平均值: 均值", average_mean, "最大值:", average_max, "最小值:", average_min)
+                                        data.loc[str(test_name) + '-平均值',dev_column_min] = average_min
+                                        data.loc[str(test_name) + '-平均值', dev_column_max] = average_max
+                                        data.loc[str(test_name) + '-平均值', dev_column_mean] = average_mean
 
-                                    variance_min = np.min(variance_list)
-                                    variance_max = np.max(variance_list)
-                                    variance_mean = int(np.mean(variance_list))
-                                    print("方差: 均值", variance_mean, "最大值:", variance_max, "最小值:", variance_min)
-                                    data.loc[str(test_name) + '-方差',dev_column_min] = variance_min
-                                    data.loc[str(test_name) + '-方差', dev_column_max] = variance_max
-                                    data.loc[str(test_name) + '-方差', dev_column_mean] = variance_mean
+                                    if len(variance_list) != 0:
+                                        variance_min = np.min(variance_list, initial=0)
+                                        variance_max = np.max(variance_list, initial=0)
+                                        variance_mean = int(np.mean(variance_list))
+                                        print("方差: 均值", variance_mean, "最大值:", variance_max, "最小值:", variance_min)
+                                        data.loc[str(test_name) + '-方差',dev_column_min] = variance_min
+                                        data.loc[str(test_name) + '-方差', dev_column_max] = variance_max
+                                        data.loc[str(test_name) + '-方差', dev_column_mean] = variance_mean
 
                                     #校验L-D(A)
                                     print("通用-A通道校机差值:", cali_value_a)
@@ -378,6 +383,7 @@ class SelectDevice(QWidget):
                                     print("通用-B通道校机差值:", cali_value_b)
                                     data.loc['通用-B通道校机差值', dev_column_mean] = cali_value_b
                                     print("---------------------------------------")
+
                                 increment_ration_list.clear()
                                 ration_of_change_list.clear()
                                 rise_cnt_list.clear()
@@ -410,10 +416,12 @@ class SelectDevice(QWidget):
                                           ppm_value)
                                     increment_ration_list.append(increment_ration_value)
                                     ration_of_change_list.append(ration_of_change_value)
-                                    rise_cnt_list.append(rise_cnt_value)
-                                    average_list.append(average_value)
-                                    variance_list.append(variance_value)
-                                    ppm_list.append(ppm_value)
+
+                                    if increment_a_value < 380:
+                                        rise_cnt_list.append(rise_cnt_value)
+                                        average_list.append(average_value)
+                                        variance_list.append(variance_value)
+                                        ppm_list.append(ppm_value)
                             elif start_mark_flag:
                                 start_mark_flag = False
                                 print("init increment_b_value=", increment_b_value)
