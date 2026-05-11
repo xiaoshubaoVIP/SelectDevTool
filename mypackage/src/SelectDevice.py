@@ -162,17 +162,17 @@ class SelectDevice(QWidget):
         print(sheet_name)
         try:
             set_data = pd.read_excel(self.set_file_path, sheet_name=sheet_name, dtype=str)  # 以字符串形式打开并读取excel表格
-            set_data = pd.DataFrame(set_data)
-            print(set_data)
+            pd_set_data = pd.DataFrame(set_data)
+            print(pd_set_data)
 
             self.text_edit.append(self.valid.format(sheet_name+"配置文件打开✅"))
         except FileNotFoundError as e:
             self.text_edit.append(self.error.format(sheet_name+"配置文件打开❌"))
             return
 
-        data = pd.DataFrame()
+        pd_data = pd.DataFrame()
         #通过修改index属性更改行名称
-        data.index = ['通用-A通道校机差值', '通用-B通道校机差值', '通用-B初始增量',
+        pd_data.index = ['通用-A通道校机差值', '通用-B通道校机差值', '通用-B通道初始增量',
             'UL烟雾-灵敏度', 'UL烟雾-增量比值', 'UL烟雾-比值变化率', 'UL烟雾-计数', 'UL烟雾-PPM', 'UL烟雾-平均值', 'UL烟雾-方差',
             'PU烟雾-灵敏度', 'PU烟雾-增量比值', 'PU烟雾-比值变化率', 'PU烟雾-计数', 'PU烟雾-PPM', 'PU烟雾-平均值', 'PU烟雾-方差',
             '油烟-增量比值', '油烟-比值变化率', '油烟-计数', '油烟-PPM', '油烟-平均值',  '油烟-方差', '油烟-结束时红光增量',
@@ -262,9 +262,9 @@ class SelectDevice(QWidget):
                             dev_column_min = str(dev_name[0]) + '_min'
                             dev_column_max = str(dev_name[0]) + '_max'
                             dev_column_mean = str(dev_name[0]) + '_mean'
-                            data.loc[:, dev_column_min] = 0
-                            data.loc[:, dev_column_max] = 0
-                            data.loc[:, dev_column_mean] = 0
+                            pd_data.loc[:, dev_column_min] = 0
+                            pd_data.loc[:, dev_column_max] = 0
+                            pd_data.loc[:, dev_column_mean] = 0
                             print("开始标记：", dev_name, f"({test_name})")
                     elif sub_string_end in line: #结束标记
                         # print(line.split(sub_string_end, maxsplit=1))
@@ -329,59 +329,146 @@ class SelectDevice(QWidget):
                                     print(dev_name)
                                     dev_name = None
                                     if len(increment_ration_list) !=0:
-                                        increment_ration_min = np.min(increment_ration_list, initial=0)
-                                        increment_ration_max = np.max(increment_ration_list, initial=0)
+                                        increment_ration_min = np.min(increment_ration_list)
+                                        increment_ration_max = np.max(increment_ration_list)
                                         increment_ration_mean = int(np.mean(increment_ration_list))
                                         print("增量比值: 均值", increment_ration_mean,
                                               "最大值:", increment_ration_max, "最小值:", increment_ration_min)
-                                        data.loc[str(test_name) + '-增量比值',dev_column_min] = increment_ration_min
-                                        data.loc[str(test_name) + '-增量比值', dev_column_max] = increment_ration_max
-                                        data.loc[str(test_name) + '-增量比值', dev_column_mean] = increment_ration_mean
+                                        test_type = str(test_name) + '-增量比值'
+                                        pd_data.loc[test_type, dev_column_min] = increment_ration_min
+                                        pd_data.loc[test_type, dev_column_max] = increment_ration_max
+                                        pd_data.loc[test_type, dev_column_mean] = increment_ration_mean
+                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件'].values[0]
+                                        if result == '是':
+                                            min_value = \
+                                                pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
+                                            max_value = \
+                                                pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
+                                            if int(min_value) < increment_ration_min and \
+                                                                        increment_ration_max < int(max_value):
+                                                print('OK')
+                                            print(test_type+':', min_value, '~',max_value)
+
 
                                     if len(ration_of_change_list) != 0:
-                                        ration_of_change_min = np.min(ration_of_change_list, initial=0)
-                                        ration_of_change_max = np.max(ration_of_change_list, initial=0)
+                                        ration_of_change_min = np.min(ration_of_change_list)
+                                        ration_of_change_max = np.max(ration_of_change_list)
                                         ration_of_change_mean = int(np.mean(ration_of_change_list))
                                         print("比值变化率: 均值", ration_of_change_mean,
                                               "最大值:", ration_of_change_max, "最小值:", ration_of_change_min)
-                                        data.loc[str(test_name) + '-比值变化率',dev_column_min] = ration_of_change_min
-                                        data.loc[str(test_name) + '-比值变化率', dev_column_max] = ration_of_change_max
-                                        data.loc[str(test_name) + '-比值变化率', dev_column_mean] = ration_of_change_mean
+                                        test_type = str(test_name) + '-比值变化率'
+                                        pd_data.loc[test_type, dev_column_min] = ration_of_change_min
+                                        pd_data.loc[test_type, dev_column_max] = ration_of_change_max
+                                        pd_data.loc[test_type, dev_column_mean] = ration_of_change_mean
+                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件'].values[0]
+                                        if result == '是':
+                                            min_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
+                                            max_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
+                                            if int(min_value) < ration_of_change_min and \
+                                                                            ration_of_change_max < int(max_value):
+                                                print('OK')
+                                            print(test_type+':', min_value, '~',max_value)
 
                                     if len(rise_cnt_list) != 0:
-                                        rise_cnt_min = np.min(rise_cnt_list, initial=0)
-                                        rise_cnt_max = np.max(rise_cnt_list, initial=0)
+                                        rise_cnt_min = np.min(rise_cnt_list)
+                                        rise_cnt_max = np.max(rise_cnt_list)
                                         rise_cnt_mean = int(np.mean(rise_cnt_list))
                                         print("计数: 均值", rise_cnt_mean, "最大值:", rise_cnt_max, "最小值:", rise_cnt_min)
-                                        data.loc[str(test_name) + '-计数',dev_column_min] = rise_cnt_min
-                                        data.loc[str(test_name) + '-计数', dev_column_max] = rise_cnt_max
-                                        data.loc[str(test_name) + '-计数', dev_column_mean] = rise_cnt_mean
+                                        test_type = str(test_name) + '-计数'
+                                        pd_data.loc[test_type, dev_column_min] = rise_cnt_min
+                                        pd_data.loc[test_type, dev_column_max] = rise_cnt_max
+                                        pd_data.loc[test_type, dev_column_mean] = rise_cnt_mean
+                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件'].values[0]
+                                        if result == '是':
+                                            min_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
+                                            max_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
+                                            if int(min_value) < rise_cnt_min and rise_cnt_max < int(max_value):
+                                                print('OK')
+                                            print(test_type+':', min_value, '~',max_value)
+
 
                                     if len(average_list) != 0:
-                                        average_min = np.min(average_list, initial=0)
-                                        average_max = np.max(average_list, initial=0)
+                                        average_min = np.min(average_list)
+                                        average_max = np.max(average_list)
                                         average_mean = int(np.mean(average_list))
                                         print("平均值: 均值", average_mean, "最大值:", average_max, "最小值:", average_min)
-                                        data.loc[str(test_name) + '-平均值',dev_column_min] = average_min
-                                        data.loc[str(test_name) + '-平均值', dev_column_max] = average_max
-                                        data.loc[str(test_name) + '-平均值', dev_column_mean] = average_mean
+                                        test_type = str(test_name) + '-平均值'
+                                        pd_data.loc[test_type, dev_column_min] = average_min
+                                        pd_data.loc[test_type, dev_column_max] = average_max
+                                        pd_data.loc[test_type, dev_column_mean] = average_mean
+                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_name) + '-平均值+方差', '条件'].values[0]
+                                        if result == '是':
+                                            min_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
+                                            max_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
+                                            if int(min_value) < average_min and average_max < int(max_value):
+                                                print('OK')
+                                            print(test_type+':', min_value, '~',max_value)
 
                                     if len(variance_list) != 0:
-                                        variance_min = np.min(variance_list, initial=0)
-                                        variance_max = np.max(variance_list, initial=0)
+                                        variance_min = np.min(variance_list)
+                                        variance_max = np.max(variance_list)
                                         variance_mean = int(np.mean(variance_list))
                                         print("方差: 均值", variance_mean, "最大值:", variance_max, "最小值:", variance_min)
-                                        data.loc[str(test_name) + '-方差',dev_column_min] = variance_min
-                                        data.loc[str(test_name) + '-方差', dev_column_max] = variance_max
-                                        data.loc[str(test_name) + '-方差', dev_column_mean] = variance_mean
+                                        test_type = str(test_name) + '-方差'
+                                        pd_data.loc[test_type, dev_column_min] = variance_min
+                                        pd_data.loc[test_type, dev_column_max] = variance_max
+                                        pd_data.loc[test_type, dev_column_mean] = variance_mean
+                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_name) + '-平均值+方差', '条件'].values[0]
+                                        if result == '是':
+                                            min_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
+                                            max_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
+                                            if int(min_value) < variance_min and variance_max < int(max_value):
+                                                print('OK')
+                                            print(test_type+':', min_value, '~',max_value)
 
                                     #校验L-D(A)
                                     print("通用-A通道校机差值:", cali_value_a)
-                                    data.loc['通用-A通道校机差值', dev_column_mean] = cali_value_a
+                                    test_type = '通用-A通道校机差值'
+                                    pd_data.loc[test_type, dev_column_mean] = cali_value_a
+                                    result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件'].values[0]
+                                    if result == '是':
+                                        min_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
+                                        max_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
+                                        if int(min_value)  < cali_value_a < int(max_value):
+                                            print('OK')
+                                        print(test_type + ':', min_value, '~', max_value)
 
                                     #校验L-D(B)
                                     print("通用-B通道校机差值:", cali_value_b)
-                                    data.loc['通用-B通道校机差值', dev_column_mean] = cali_value_b
+                                    test_type = '通用-B通道校机差值'
+                                    pd_data.loc[test_type, dev_column_mean] = cali_value_b
+                                    result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件'].values[0]
+                                    if result == '是':
+                                        min_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
+                                        max_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
+                                        if int(min_value)  < cali_value_b < int(max_value):
+                                            print('OK')
+                                        print(test_type + ':', min_value, '~', max_value)
+
+                                    #初始增量(B)
+                                    test_type = '通用-B通道初始增量'
+                                    result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件'].values[0]
+                                    if result == '是':
+                                        init_increment_b_value = pd_data.loc[test_type, dev_column_mean]
+                                        min_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
+                                        max_value = \
+                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
+                                        if int(min_value) < init_increment_b_value < int(max_value):
+                                            print('OK')
+                                        print(test_type + ':', min_value, '~', max_value)
                                     print("---------------------------------------")
 
                                 increment_ration_list.clear()
@@ -425,11 +512,11 @@ class SelectDevice(QWidget):
                             elif start_mark_flag:
                                 start_mark_flag = False
                                 print("init increment_b_value=", increment_b_value)
-                                data.loc['通用-B初始增量', dev_column_mean] = increment_b_value
+                                pd_data.loc['通用-B通道初始增量', dev_column_mean] = increment_b_value
 
 
-        print("数据:",data)
-        self.df = data
+        print("数据:",pd_data)
+        self.df = pd_data
         self.show_save_dialog()
 
     def show_save_dialog(self):
