@@ -338,17 +338,21 @@ class SelectDevice(QWidget):
                                         pd_data.loc[test_type, dev_column_min] = increment_ration_min
                                         pd_data.loc[test_type, dev_column_max] = increment_ration_max
                                         pd_data.loc[test_type, dev_column_mean] = increment_ration_mean
-                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件'].values[0]
-                                        if result == '是':
-                                            min_value = \
-                                                pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
-                                            max_value = \
-                                                pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
-                                            if int(min_value) < increment_ration_min and \
-                                                                        increment_ration_max < int(max_value):
-                                                print('OK')
-                                            print(test_type+':', min_value, '~',max_value)
-
+                                        #条件判断是否✔
+                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                        if len(result):
+                                            result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                          str(test_type), '条件'].values[0]
+                                            if result_data == '是':
+                                                min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                            str(test_type), '最小值'].values[0]
+                                                max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                            str(test_type), '最大值'].values[0]
+                                                if int(min_value) < increment_ration_min and \
+                                                                            increment_ration_max < int(max_value):
+                                                    print('[✅]', test_type + ':', min_value, '~', max_value)
+                                                else:
+                                                    print('[❌]', test_type + ':', min_value, '~', max_value)
 
                                     if len(ration_of_change_list) != 0:
                                         ration_of_change_min = np.min(ration_of_change_list)
@@ -360,16 +364,21 @@ class SelectDevice(QWidget):
                                         pd_data.loc[test_type, dev_column_min] = ration_of_change_min
                                         pd_data.loc[test_type, dev_column_max] = ration_of_change_max
                                         pd_data.loc[test_type, dev_column_mean] = ration_of_change_mean
-                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件'].values[0]
-                                        if result == '是':
-                                            min_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
-                                            max_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
-                                            if int(min_value) < ration_of_change_min and \
-                                                                            ration_of_change_max < int(max_value):
-                                                print('OK')
-                                            print(test_type+':', min_value, '~',max_value)
+                                        #条件判断是否✔
+                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                        if len(result):
+                                            result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                          str(test_type), '条件'].values[0]
+                                            if result_data == '是':
+                                                min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                            str(test_type), '最小值'].values[0]
+                                                max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                            str(test_type), '最大值'].values[0]
+                                                if int(min_value) < ration_of_change_min and \
+                                                                                ration_of_change_max < int(max_value):
+                                                    print('[✅]', test_type + ':', min_value, '~', max_value)
+                                                else:
+                                                    print('[❌]', test_type + ':', min_value, '~', max_value)
 
                                     if len(rise_cnt_list) != 0:
                                         rise_cnt_min = np.min(rise_cnt_list)
@@ -380,15 +389,20 @@ class SelectDevice(QWidget):
                                         pd_data.loc[test_type, dev_column_min] = rise_cnt_min
                                         pd_data.loc[test_type, dev_column_max] = rise_cnt_max
                                         pd_data.loc[test_type, dev_column_mean] = rise_cnt_mean
-                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件'].values[0]
-                                        if result == '是':
-                                            min_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
-                                            max_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
-                                            if int(min_value) < rise_cnt_min and rise_cnt_max < int(max_value):
-                                                print('OK')
-                                            print(test_type+':', min_value, '~',max_value)
+                                        #条件判断是否✔
+                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                        if len(result):
+                                            result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                     str(test_type), '条件'].values[0]
+                                            if result_data == '是':
+                                                min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                            str(test_type), '最小值'].values[0]
+                                                max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                            str(test_type), '最大值'].values[0]
+                                                if int(min_value) < rise_cnt_min and rise_cnt_max < int(max_value):
+                                                    print('[✅]', test_type+':', min_value, '~',max_value)
+                                                else:
+                                                    print('[❌]', test_type+':', min_value, '~',max_value)
 
 
                                     if len(average_list) != 0:
@@ -400,15 +414,20 @@ class SelectDevice(QWidget):
                                         pd_data.loc[test_type, dev_column_min] = average_min
                                         pd_data.loc[test_type, dev_column_max] = average_max
                                         pd_data.loc[test_type, dev_column_mean] = average_mean
-                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_name) + '-平均值+方差', '条件'].values[0]
-                                        if result == '是':
-                                            min_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
-                                            max_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
-                                            if int(min_value) < average_min and average_max < int(max_value):
-                                                print('OK')
-                                            print(test_type+':', min_value, '~',max_value)
+                                        #条件判断是否✔
+                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                        if len(result):
+                                            result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                        str(test_type), '条件'].values[0]
+                                            if result_data == '是':
+                                                min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                            str(test_type), '最小值'].values[0]
+                                                max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                            str(test_type), '最大值'].values[0]
+                                                if int(min_value) < average_min and average_max < int(max_value):
+                                                    print('[✅]', test_type + ':', min_value, '~', max_value)
+                                                else:
+                                                    print('[❌]', test_type + ':', min_value, '~', max_value)
 
                                     if len(variance_list) != 0:
                                         variance_min = np.min(variance_list)
@@ -419,56 +438,76 @@ class SelectDevice(QWidget):
                                         pd_data.loc[test_type, dev_column_min] = variance_min
                                         pd_data.loc[test_type, dev_column_max] = variance_max
                                         pd_data.loc[test_type, dev_column_mean] = variance_mean
-                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_name) + '-平均值+方差', '条件'].values[0]
-                                        if result == '是':
-                                            min_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
-                                            max_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
-                                            if int(min_value) < variance_min and variance_max < int(max_value):
-                                                print('OK')
-                                            print(test_type+':', min_value, '~',max_value)
+                                        #条件判断是否✔
+                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                        if len(result):
+                                            result_data = pd_set_data.loc[pd_set_data['名称'] ==
+                                                                          str(test_type), '条件'].values[0]
+                                            if result_data == '是':
+                                                min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                            str(test_type), '最小值'].values[0]
+                                                max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                            str(test_type), '最大值'].values[0]
+                                                if int(min_value) < variance_min and variance_max < int(max_value):
+                                                    print('[✅]', test_type + ':', min_value, '~', max_value)
+                                                else:
+                                                    print('[❌]', test_type + ':', min_value, '~', max_value)
 
                                     #校验L-D(A)
                                     print("通用-A通道校机差值:", cali_value_a)
                                     test_type = '通用-A通道校机差值'
                                     pd_data.loc[test_type, dev_column_mean] = cali_value_a
-                                    result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件'].values[0]
-                                    if result == '是':
-                                        min_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
-                                        max_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
-                                        if int(min_value)  < cali_value_a < int(max_value):
-                                            print('OK')
-                                        print(test_type + ':', min_value, '~', max_value)
+                                    # 条件判断是否✔
+                                    result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                    if len(result):
+                                        result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                      str(test_type), '条件'].values[0]
+                                        if result_data == '是':
+                                            min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                        str(test_type), '最小值'].values[0]
+                                            max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                        str(test_type), '最大值'].values[0]
+                                            if int(min_value)  < cali_value_a < int(max_value):
+                                                print('[✅]', test_type+':', min_value, '~',max_value)
+                                            else:
+                                                print('[❌]', test_type+':', min_value, '~',max_value)
 
                                     #校验L-D(B)
                                     print("通用-B通道校机差值:", cali_value_b)
                                     test_type = '通用-B通道校机差值'
                                     pd_data.loc[test_type, dev_column_mean] = cali_value_b
-                                    result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件'].values[0]
-                                    if result == '是':
-                                        min_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
-                                        max_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
-                                        if int(min_value)  < cali_value_b < int(max_value):
-                                            print('OK')
-                                        print(test_type + ':', min_value, '~', max_value)
+                                    # 条件判断是否✔
+                                    result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                    if len(result):
+                                        result_data = pd_set_data.loc[pd_set_data['名称'] ==
+                                                                      str(test_type), '条件'].values[0]
+                                        if result_data == '是':
+                                            min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                        str(test_type), '最小值'].values[0]
+                                            max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                        str(test_type), '最大值'].values[0]
+                                            if int(min_value)  < cali_value_b < int(max_value):
+                                                print('[✅]', test_type + ':', min_value, '~', max_value)
+                                            else:
+                                                print('[❌]', test_type + ':', min_value, '~', max_value)
 
                                     #初始增量(B)
                                     test_type = '通用-B通道初始增量'
-                                    result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件'].values[0]
-                                    if result == '是':
-                                        init_increment_b_value = pd_data.loc[test_type, dev_column_mean]
-                                        min_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最小值'].values[0]
-                                        max_value = \
-                                            pd_set_data.loc[pd_set_data['名称'] == str(test_type), '最大值'].values[0]
-                                        if int(min_value) < init_increment_b_value < int(max_value):
-                                            print('OK')
-                                        print(test_type + ':', min_value, '~', max_value)
+                                    # 条件判断是否✔
+                                    result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                    if len(result):
+                                        result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                      str(test_type), '条件'].values[0]
+                                        if result_data == '是':
+                                            init_increment_b_value = pd_data.loc[test_type, dev_column_mean]
+                                            min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                        str(test_type), '最小值'].values[0]
+                                            max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                        str(test_type), '最大值'].values[0]
+                                            if int(min_value) < init_increment_b_value < int(max_value):
+                                                print('[✅]', test_type + ':', min_value, '~', max_value)
+                                            else:
+                                                print('[❌]', test_type + ':', min_value, '~', max_value)
                                     print("---------------------------------------")
 
                                 increment_ration_list.clear()
