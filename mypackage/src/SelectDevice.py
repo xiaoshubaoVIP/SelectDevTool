@@ -259,15 +259,39 @@ class SelectDevice(QWidget):
                         dev_name = re.findall(pattern1, line)
                         if dev_name is not None:
                             start_mark_flag = True
-                            dev_column_min = str(dev_name[0]) + '_min'
-                            dev_column_max = str(dev_name[0]) + '_max'
-                            dev_column_mean = str(dev_name[0]) + '_mean'
+                            dev_name_num = str(dev_name[0])
+                            dev_column_min = dev_name_num + '_min'
+                            dev_column_max = dev_name_num + '_max'
+                            dev_column_mean = dev_name_num + '_mean'
                             pd_data.loc[:, dev_column_min] = 0
                             pd_data.loc[:, dev_column_max] = 0
                             pd_data.loc[:, dev_column_mean] = 0
                             print("开始标记：", dev_name, f"({test_name})")
                     elif sub_string_end in line: #结束标记
                         # print(line.split(sub_string_end, maxsplit=1))
+                        if test_name == "油烟":
+                            test_type = '油烟-结束时红光增量'
+                            pd_data.loc[test_type, dev_column_mean] = increment_a_value
+                            print('油烟结束时红光增量=', increment_a_value)
+                            result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                            if len(result):
+                                result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                                              str(test_type), '条件'].values[0]
+                                if result_data == '是':
+                                    min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                str(test_type), '最小值'].values[0]
+                                    max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                                                str(test_type), '最大值'].values[0]
+                                    if int(min_value) < increment_a_value < int(max_value):
+                                        print('[✅]', test_type + ':', increment_a_value, f'[{min_value}',
+                                                                                            '~', f'{max_value}]')
+                                    else:
+                                        pd_data[dev_column_mean] = pd_data[dev_column_mean].astype('object')
+                                        pd_data.loc[test_type, dev_column_mean] = str(increment_a_value) + '(F)'
+                                        print(f'[❌][{dev_name_num}]', test_type + ':', increment_a_value,
+                                                                            f'[{min_value}', '~', f'{max_value}]')
+                                        self.text_edit.append(f'[{dev_name_num}]' + f'{test_type}:=' +
+                                            f'{increment_a_value}' + f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                         print("结束标记")
                     elif dev_name is not None:
                         if "Receive" not in line:
@@ -327,7 +351,7 @@ class SelectDevice(QWidget):
                                 if len(increment_ration_list) > 2:
                                     print("---------------------------------------")
                                     print(dev_name)
-                                    dev_name_num = str(dev_name[0])
+                                    dev_name = None
                                     if len(increment_ration_list) !=0:
                                         increment_ration_min = np.min(increment_ration_list)
                                         increment_ration_max = np.max(increment_ration_list)
@@ -609,7 +633,7 @@ class SelectDevice(QWidget):
                                                                       f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                     print("---------------------------------------")
 
-                                dev_name = None
+
                                 increment_ration_list.clear()
                                 ration_of_change_list.clear()
                                 rise_cnt_list.clear()
@@ -710,6 +734,9 @@ class SelectDevice(QWidget):
             fill_child_header = PatternFill(start_color='DDD9C4', end_color='DDD9C4', fill_type='solid')
             fill_warning = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
 
+            # 靠左对齐
+            left_align = Alignment(horizontal='right')
+
             # 1. 需要先写入值
             rows = dataframe_to_rows(self.df, index=True, header=True)
             for r_idx, row in enumerate(rows, 1):  # 从第1行开始计数
@@ -745,8 +772,9 @@ class SelectDevice(QWidget):
                         if '(F)' in str(cell.value):
                             # 假设 pd_data['col'] 包含 'name(F)'
                             #pd_data['col名'] = pd_data['col名'].str.replace('(F)', '', regex=False)
-                            cell.fill = fill_warning
                             wb_s.cell(row=r_idx, column=c_idx, value=str(value).replace('(F)', ''))
+                            cell.fill = fill_warning
+                            cell.alignment = left_align
 
                             header_cell = wb_s.cell(row=1, column=c_idx)
                             header_cell.fill = fill_warning
