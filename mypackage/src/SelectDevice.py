@@ -255,9 +255,13 @@ class SelectDevice(QWidget):
                         else:
                             test_name = "Null"
 
+                        print('start1:', line)
                         pattern1 = r'\d+\#'
-                        dev_name = re.findall(pattern1, line)
-                        if dev_name is not None:
+                        # dev_name = re.findall(pattern1, line)
+                        # print('start2:', dev_name)
+
+                        dev_name = re.search(pattern1, str(line))  # 使用 search 更稳妥，或者确保 findall 有结果
+                        if dev_name:
                             start_mark_flag = True
                             dev_name_num = str(dev_name[0])
                             dev_column_min = dev_name_num + '_min'
@@ -267,6 +271,13 @@ class SelectDevice(QWidget):
                             pd_data.loc[:, dev_column_max] = 0
                             pd_data.loc[:, dev_column_mean] = 0
                             print("开始标记：", dev_name, f"({test_name})")
+                        else:
+                            sub_line = line.split(sub_string_start, maxsplit=1)
+                            if sub_line[1] in line:
+                                err_dev_name = sub_line[1]
+                            self.text_edit.append("设备编号不符号要求:" + self.warning.format(f'{err_dev_name}⚠️'))
+                            dev_name = None
+                            continue
                     elif sub_string_end in line: #结束标记
                         # print(line.split(sub_string_end, maxsplit=1))
                         if test_name == "油烟":
