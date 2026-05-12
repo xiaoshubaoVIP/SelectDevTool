@@ -261,9 +261,10 @@ class SelectDevice(QWidget):
                         # print('start2:', dev_name)
 
                         dev_name = re.search(pattern1, str(line))  # 使用 search 更稳妥，或者确保 findall 有结果
+
                         if dev_name:
                             start_mark_flag = True
-                            dev_name_num = str(dev_name[0])
+                            dev_name_num = str(dev_name.group(0))
                             dev_column_min = dev_name_num + '_min'
                             dev_column_max = dev_name_num + '_max'
                             dev_column_mean = dev_name_num + '_mean'
@@ -374,36 +375,36 @@ class SelectDevice(QWidget):
                                         pd_data.loc[test_type, dev_column_max] = increment_ration_max
                                         pd_data.loc[test_type, dev_column_mean] = increment_ration_mean
                                         #条件判断是否✔
-                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
-                                        if len(result):
-                                            result_data = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                          str(test_type), '条件'].values[0]
-                                            if result_data == '是':
-                                                min_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                            str(test_type), '最小值'].values[0]
-                                                max_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                            str(test_type), '最大值'].values[0]
-                                                if int(min_value) > increment_ration_min:
-                                                    pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
-                                                    pd_data.loc[test_type, dev_column_min] = \
-                                                                                    str(increment_ration_min) + '(F)'
-                                                    print(f'[❌][{dev_name_num}]', test_type + ':最小值',
-                                                          increment_ration_min, f'[{min_value}', '~', f'{max_value}]')
-                                                    self.text_edit.append(f'[{dev_name_num}]'+
-                                                        f'{test_type}:最小值='+f'{increment_ration_min}'+
-                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
-                                                elif int(max_value) < increment_ration_max:
-                                                    pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
-                                                    pd_data.loc[test_type, dev_column_max] = \
-                                                                                    str(increment_ration_max) + '(F)'
-                                                    print(f'[❌][{dev_name_num}]', test_type + ':最大值',
-                                                          increment_ration_max, f'[{min_value}', '~', f'{max_value}]')
-                                                    self.text_edit.append(f'[{dev_name_num}]'+
-                                                        f'{test_type}:最大值='+f'{increment_ration_max}'+
-                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
-                                                else:
-                                                    print('[✅]', test_type + ':', f'[{min_value}', '~',
-                                                          f'{max_value}]')
+                                        # result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                        # if len(result):
+                                        #     result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                   str(test_type), '条件'].values[0]
+                                        #     if result_data == '是':
+                                        #         min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                     str(test_type), '最小值'].values[0]
+                                        #         max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                     str(test_type), '最大值'].values[0]
+                                        #         if int(min_value) > increment_ration_min:
+                                        #             pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
+                                        #             pd_data.loc[test_type, dev_column_min] = \
+                                        #                                             str(increment_ration_min) + '(F)'
+                                        #             print(f'[❌][{dev_name_num}]', test_type + ':最小值',
+                                        #                   increment_ration_min, f'[{min_value}', '~', f'{max_value}]')
+                                        #             self.text_edit.append(f'[{dev_name_num}]'+
+                                        #                 f'{test_type}:最小值='+f'{increment_ration_min}'+
+                                        #                                 f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                        #         elif int(max_value) < increment_ration_max:
+                                        #             pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
+                                        #             pd_data.loc[test_type, dev_column_max] = \
+                                        #                                             str(increment_ration_max) + '(F)'
+                                        #             print(f'[❌][{dev_name_num}]', test_type + ':最大值',
+                                        #                   increment_ration_max, f'[{min_value}', '~', f'{max_value}]')
+                                        #             self.text_edit.append(f'[{dev_name_num}]'+
+                                        #                 f'{test_type}:最大值='+f'{increment_ration_max}'+
+                                        #                                 f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                        #         else:
+                                        #             print('[✅]', test_type + ':', f'[{min_value}', '~',
+                                        #                   f'{max_value}]')
 
                                     if len(ration_of_change_list) != 0:
                                         ration_of_change_min = np.min(ration_of_change_list)
@@ -416,36 +417,36 @@ class SelectDevice(QWidget):
                                         pd_data.loc[test_type, dev_column_max] = ration_of_change_max
                                         pd_data.loc[test_type, dev_column_mean] = ration_of_change_mean
                                         #条件判断是否✔
-                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
-                                        if len(result):
-                                            result_data = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                          str(test_type), '条件'].values[0]
-                                            if result_data == '是':
-                                                min_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                            str(test_type), '最小值'].values[0]
-                                                max_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                            str(test_type), '最大值'].values[0]
-                                                if int(min_value) > ration_of_change_min:
-                                                    pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
-                                                    pd_data.loc[test_type, dev_column_min] = \
-                                                                                    str(ration_of_change_min) + '(F)'
-                                                    print(f'[❌][{dev_name_num}]', test_type + ':最小值',
-                                                          ration_of_change_min, f'[{min_value}', '~', f'{max_value}]')
-                                                    self.text_edit.append(f'[{dev_name_num}]'+
-                                                        f'{test_type}:最小值='+f'{ration_of_change_min}'+
-                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
-                                                elif int(max_value) < ration_of_change_max:
-                                                    pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
-                                                    pd_data.loc[test_type, dev_column_max] = \
-                                                                                    str(ration_of_change_max) + '(F)'
-                                                    print(f'[❌][{dev_name_num}]', test_type + ':最大值',
-                                                          ration_of_change_max, f'[{min_value}', '~', f'{max_value}]')
-                                                    self.text_edit.append(f'[{dev_name_num}]'+
-                                                        f'{test_type}:最大值='+f'{ration_of_change_max}'+
-                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
-                                                else:
-                                                    print('[✅]', test_type + ':', f'[{min_value}', '~',
-                                                          f'{max_value}]')
+                                        # result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                        # if len(result):
+                                        #     result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                   str(test_type), '条件'].values[0]
+                                        #     if result_data == '是':
+                                        #         min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                     str(test_type), '最小值'].values[0]
+                                        #         max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                     str(test_type), '最大值'].values[0]
+                                        #         if int(min_value) > ration_of_change_min:
+                                        #             pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
+                                        #             pd_data.loc[test_type, dev_column_min] = \
+                                        #                                             str(ration_of_change_min) + '(F)'
+                                        #             print(f'[❌][{dev_name_num}]', test_type + ':最小值',
+                                        #                   ration_of_change_min, f'[{min_value}', '~', f'{max_value}]')
+                                        #             self.text_edit.append(f'[{dev_name_num}]'+
+                                        #                 f'{test_type}:最小值='+f'{ration_of_change_min}'+
+                                        #                                 f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                        #         elif int(max_value) < ration_of_change_max:
+                                        #             pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
+                                        #             pd_data.loc[test_type, dev_column_max] = \
+                                        #                                             str(ration_of_change_max) + '(F)'
+                                        #             print(f'[❌][{dev_name_num}]', test_type + ':最大值',
+                                        #                   ration_of_change_max, f'[{min_value}', '~', f'{max_value}]')
+                                        #             self.text_edit.append(f'[{dev_name_num}]'+
+                                        #                 f'{test_type}:最大值='+f'{ration_of_change_max}'+
+                                        #                                 f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                        #         else:
+                                        #             print('[✅]', test_type + ':', f'[{min_value}', '~',
+                                        #                   f'{max_value}]')
 
                                     if len(rise_cnt_list) != 0:
                                         rise_cnt_min = np.min(rise_cnt_list)
@@ -457,34 +458,34 @@ class SelectDevice(QWidget):
                                         pd_data.loc[test_type, dev_column_max] = rise_cnt_max
                                         pd_data.loc[test_type, dev_column_mean] = rise_cnt_mean
                                         #条件判断是否✔
-                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
-                                        if len(result):
-                                            result_data = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                     str(test_type), '条件'].values[0]
-                                            if result_data == '是':
-                                                min_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                            str(test_type), '最小值'].values[0]
-                                                max_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                            str(test_type), '最大值'].values[0]
-                                                if int(min_value) > rise_cnt_min:
-                                                    pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
-                                                    pd_data.loc[test_type, dev_column_min] = str(rise_cnt_min) + '(F)'
-                                                    print(f'[❌][{dev_name_num}]', test_type + ':最小值', rise_cnt_min,
-                                                          f'[{min_value}', '~', f'{max_value}]')
-                                                    self.text_edit.append(f'[{dev_name_num}]'+
-                                                        f'{test_type}:最小值='+f'{rise_cnt_min}'+
-                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
-                                                elif int(max_value) < rise_cnt_max:
-                                                    pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
-                                                    pd_data.loc[test_type, dev_column_max] = str(rise_cnt_max)+'(F)'
-                                                    print(f'[❌][{dev_name_num}]', test_type + ':最大值', rise_cnt_max,
-                                                          f'[{min_value}', '~', f'{max_value}]')
-                                                    self.text_edit.append(f'[{dev_name_num}]'+
-                                                        f'{test_type}:最大值='+f'{rise_cnt_max}'+
-                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
-                                                else:
-                                                    print('[✅]', test_type + ':', f'[{min_value}', '~',
-                                                          f'{max_value}]')
+                                        # result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                        # if len(result):
+                                        #     result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                              str(test_type), '条件'].values[0]
+                                        #     if result_data == '是':
+                                        #         min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                     str(test_type), '最小值'].values[0]
+                                        #         max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                     str(test_type), '最大值'].values[0]
+                                        #         if int(min_value) > rise_cnt_min:
+                                        #             pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
+                                        #             pd_data.loc[test_type, dev_column_min] = str(rise_cnt_min) + '(F)'
+                                        #             print(f'[❌][{dev_name_num}]', test_type + ':最小值', rise_cnt_min,
+                                        #                   f'[{min_value}', '~', f'{max_value}]')
+                                        #             self.text_edit.append(f'[{dev_name_num}]'+
+                                        #                 f'{test_type}:最小值='+f'{rise_cnt_min}'+
+                                        #                                 f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                        #         elif int(max_value) < rise_cnt_max:
+                                        #             pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
+                                        #             pd_data.loc[test_type, dev_column_max] = str(rise_cnt_max)+'(F)'
+                                        #             print(f'[❌][{dev_name_num}]', test_type + ':最大值', rise_cnt_max,
+                                        #                   f'[{min_value}', '~', f'{max_value}]')
+                                        #             self.text_edit.append(f'[{dev_name_num}]'+
+                                        #                 f'{test_type}:最大值='+f'{rise_cnt_max}'+
+                                        #                                 f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                        #         else:
+                                        #             print('[✅]', test_type + ':', f'[{min_value}', '~',
+                                        #                   f'{max_value}]')
 
 
                                     if len(average_list) != 0:
@@ -497,34 +498,34 @@ class SelectDevice(QWidget):
                                         pd_data.loc[test_type, dev_column_max] = average_max
                                         pd_data.loc[test_type, dev_column_mean] = average_mean
                                         #条件判断是否✔
-                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
-                                        if len(result):
-                                            result_data = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                        str(test_type), '条件'].values[0]
-                                            if result_data == '是':
-                                                min_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                            str(test_type), '最小值'].values[0]
-                                                max_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                            str(test_type), '最大值'].values[0]
-                                                if int(min_value) > average_min:
-                                                    pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
-                                                    pd_data.loc[test_type, dev_column_min] = str(average_min) + '(F)'
-                                                    print(f'[❌][{dev_name_num}]', test_type + ':最小值', average_min,
-                                                          f'[{min_value}', '~', f'{max_value}]')
-                                                    self.text_edit.append(f'[{dev_name_num}]'+
-                                                        f'{test_type}:最小值='+f'{average_min}'+
-                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
-                                                elif int(max_value) < average_max:
-                                                    pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
-                                                    pd_data.loc[test_type, dev_column_max] = str(average_max)+'(F)'
-                                                    print(f'[❌][{dev_name_num}]', test_type + ':最大值', average_max,
-                                                          f'[{min_value}', '~', f'{max_value}]')
-                                                    self.text_edit.append(f'[{dev_name_num}]'+
-                                                        f'{test_type}:最大值='+f'{average_max}'+
-                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
-                                                else:
-                                                    print('[✅]', test_type + ':', f'[{min_value}', '~',
-                                                          f'{max_value}]')
+                                        # result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                        # if len(result):
+                                        #     result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                 str(test_type), '条件'].values[0]
+                                        #     if result_data == '是':
+                                        #         min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                     str(test_type), '最小值'].values[0]
+                                        #         max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                     str(test_type), '最大值'].values[0]
+                                        #         if int(min_value) > average_min:
+                                        #             pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
+                                        #             pd_data.loc[test_type, dev_column_min] = str(average_min) + '(F)'
+                                        #             print(f'[❌][{dev_name_num}]', test_type + ':最小值', average_min,
+                                        #                   f'[{min_value}', '~', f'{max_value}]')
+                                        #             self.text_edit.append(f'[{dev_name_num}]'+
+                                        #                 f'{test_type}:最小值='+f'{average_min}'+
+                                        #                                 f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                        #         elif int(max_value) < average_max:
+                                        #             pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
+                                        #             pd_data.loc[test_type, dev_column_max] = str(average_max)+'(F)'
+                                        #             print(f'[❌][{dev_name_num}]', test_type + ':最大值', average_max,
+                                        #                   f'[{min_value}', '~', f'{max_value}]')
+                                        #             self.text_edit.append(f'[{dev_name_num}]'+
+                                        #                 f'{test_type}:最大值='+f'{average_max}'+
+                                        #                                 f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                        #         else:
+                                        #             print('[✅]', test_type + ':', f'[{min_value}', '~',
+                                        #                   f'{max_value}]')
 
                                     if len(variance_list) != 0:
                                         variance_min = np.min(variance_list)
@@ -536,112 +537,112 @@ class SelectDevice(QWidget):
                                         pd_data.loc[test_type, dev_column_max] = variance_max
                                         pd_data.loc[test_type, dev_column_mean] = variance_mean
                                         #条件判断是否✔
-                                        result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
-                                        if len(result):
-                                            result_data = pd_set_data.loc[pd_set_data['名称'] ==
-                                                                          str(test_type), '条件'].values[0]
-                                            if result_data == '是':
-                                                min_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                            str(test_type), '最小值'].values[0]
-                                                max_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                            str(test_type), '最大值'].values[0]
-                                                if int(min_value) > variance_min:
-                                                    pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
-                                                    pd_data.loc[test_type, dev_column_min] = str(variance_min) + '(F)'
-                                                    print(f'[❌][{dev_name_num}]', test_type + ':最小值', variance_min,
-                                                          f'[{min_value}', '~', f'{max_value}]')
-                                                    self.text_edit.append(f'[{dev_name_num}]'+
-                                                        f'{test_type}:最小值='+f'{variance_min}'+
-                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
-                                                elif int(max_value) < variance_max:
-                                                    pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
-                                                    pd_data.loc[test_type, dev_column_max] = str(variance_max)+'(F)'
-                                                    print(f'[❌][{dev_name_num}]', test_type + ':最大值', variance_max,
-                                                          f'[{min_value}', '~', f'{max_value}]')
-                                                    self.text_edit.append(f'[{dev_name_num}]' +
-                                                          f'{test_type}:最大值=' + f'{variance_max}' +
-                                                                        f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
-                                                else:
-                                                    print('[✅]', test_type + ':', f'[{min_value}', '~',
-                                                          f'{max_value}]')
+                                        # result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                        # if len(result):
+                                        #     result_data = pd_set_data.loc[pd_set_data['名称'] ==
+                                        #                                   str(test_type), '条件'].values[0]
+                                        #     if result_data == '是':
+                                        #         min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                     str(test_type), '最小值'].values[0]
+                                        #         max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                        #                                     str(test_type), '最大值'].values[0]
+                                        #         if int(min_value) > variance_min:
+                                        #             pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
+                                        #             pd_data.loc[test_type, dev_column_min] = str(variance_min) + '(F)'
+                                        #             print(f'[❌][{dev_name_num}]', test_type + ':最小值', variance_min,
+                                        #                   f'[{min_value}', '~', f'{max_value}]')
+                                        #             self.text_edit.append(f'[{dev_name_num}]'+
+                                        #                 f'{test_type}:最小值='+f'{variance_min}'+
+                                        #                                 f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                        #         elif int(max_value) < variance_max:
+                                        #             pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
+                                        #             pd_data.loc[test_type, dev_column_max] = str(variance_max)+'(F)'
+                                        #             print(f'[❌][{dev_name_num}]', test_type + ':最大值', variance_max,
+                                        #                   f'[{min_value}', '~', f'{max_value}]')
+                                        #             self.text_edit.append(f'[{dev_name_num}]' +
+                                        #                   f'{test_type}:最大值=' + f'{variance_max}' +
+                                        #                                 f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                        #         else:
+                                        #             print('[✅]', test_type + ':', f'[{min_value}', '~',
+                                        #                   f'{max_value}]')
 
                                     #校验L-D(A)
                                     print("通用-A通道校机差值:", cali_value_a)
                                     test_type = '通用-A通道校机差值'
                                     pd_data.loc[test_type, dev_column_mean] = cali_value_a
                                     # 条件判断是否✔
-                                    result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
-                                    if len(result):
-                                        result_data = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                      str(test_type), '条件'].values[0]
-                                        if result_data == '是':
-                                            min_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                        str(test_type), '最小值'].values[0]
-                                            max_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                        str(test_type), '最大值'].values[0]
-                                            if int(min_value)  < cali_value_a < int(max_value):
-                                                print('[✅]', test_type + ':', cali_value_a, f'[{min_value}', '~',
-                                                      f'{max_value}]')
-                                            else:
-                                                pd_data[dev_column_mean] = pd_data[dev_column_mean].astype('object')
-                                                pd_data.loc[test_type, dev_column_mean] = str(cali_value_a) + '(F)'
-                                                print(f'[❌][{dev_name_num}]', test_type + ':', cali_value_a,
-                                                                            f'[{min_value}', '~', f'{max_value}]')
-                                                self.text_edit.append(f'[{dev_name_num}]' +
-                                                                      f'{test_type}:=' + f'{cali_value_a}' +
-                                                                      f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                    # result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                    # if len(result):
+                                    #     result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                    #                                   str(test_type), '条件'].values[0]
+                                    #     if result_data == '是':
+                                    #         min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                    #                                     str(test_type), '最小值'].values[0]
+                                    #         max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                    #                                     str(test_type), '最大值'].values[0]
+                                    #         if int(min_value)  < cali_value_a < int(max_value):
+                                    #             print('[✅]', test_type + ':', cali_value_a, f'[{min_value}', '~',
+                                    #                   f'{max_value}]')
+                                    #         else:
+                                    #             pd_data[dev_column_mean] = pd_data[dev_column_mean].astype('object')
+                                    #             pd_data.loc[test_type, dev_column_mean] = str(cali_value_a) + '(F)'
+                                    #             print(f'[❌][{dev_name_num}]', test_type + ':', cali_value_a,
+                                    #                                         f'[{min_value}', '~', f'{max_value}]')
+                                    #             self.text_edit.append(f'[{dev_name_num}]' +
+                                    #                                   f'{test_type}:=' + f'{cali_value_a}' +
+                                    #                                   f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
 
                                     #校验L-D(B)
                                     print("通用-B通道校机差值:", cali_value_b)
                                     test_type = '通用-B通道校机差值'
                                     pd_data.loc[test_type, dev_column_mean] = cali_value_b
                                     # 条件判断是否✔
-                                    result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
-                                    if len(result):
-                                        result_data = pd_set_data.loc[pd_set_data['名称'] ==
-                                                                      str(test_type), '条件'].values[0]
-                                        if result_data == '是':
-                                            min_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                        str(test_type), '最小值'].values[0]
-                                            max_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                        str(test_type), '最大值'].values[0]
-                                            if int(min_value)  < cali_value_b < int(max_value):
-                                                print('[✅]', test_type + ':', cali_value_b, f'[{min_value}', '~',
-                                                      f'{max_value}]')
-                                            else:
-                                                pd_data[dev_column_mean] = pd_data[dev_column_mean].astype('object')
-                                                pd_data.loc[test_type, dev_column_mean] = str(cali_value_b) + '(F)'
-                                                print(f'[❌][{dev_name_num}]', test_type + ':', cali_value_b,
-                                                                            f'[{min_value}', '~', f'{max_value}]')
-                                                self.text_edit.append(f'[{dev_name_num}]' +
-                                                                      f'{test_type}:=' + f'{cali_value_b}' +
-                                                                      f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                    # result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                    # if len(result):
+                                    #     result_data = pd_set_data.loc[pd_set_data['名称'] ==
+                                    #                                   str(test_type), '条件'].values[0]
+                                    #     if result_data == '是':
+                                    #         min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                    #                                     str(test_type), '最小值'].values[0]
+                                    #         max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                    #                                     str(test_type), '最大值'].values[0]
+                                    #         if int(min_value)  < cali_value_b < int(max_value):
+                                    #             print('[✅]', test_type + ':', cali_value_b, f'[{min_value}', '~',
+                                    #                   f'{max_value}]')
+                                    #         else:
+                                    #             pd_data[dev_column_mean] = pd_data[dev_column_mean].astype('object')
+                                    #             pd_data.loc[test_type, dev_column_mean] = str(cali_value_b) + '(F)'
+                                    #             print(f'[❌][{dev_name_num}]', test_type + ':', cali_value_b,
+                                    #                                         f'[{min_value}', '~', f'{max_value}]')
+                                    #             self.text_edit.append(f'[{dev_name_num}]' +
+                                    #                                   f'{test_type}:=' + f'{cali_value_b}' +
+                                    #                                   f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
 
                                     #初始增量(B)
-                                    test_type = '通用-B通道初始增量'
+                                    # test_type = '通用-B通道初始增量'
                                     # 条件判断是否✔
-                                    result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
-                                    if len(result):
-                                        result_data = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                      str(test_type), '条件'].values[0]
-                                        if result_data == '是':
-                                            init_increment_b_value = pd_data.loc[test_type, dev_column_mean]
-                                            min_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                        str(test_type), '最小值'].values[0]
-                                            max_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                        str(test_type), '最大值'].values[0]
-                                            if int(min_value) < init_increment_b_value < int(max_value):
-                                                print('[✅]', test_type + ':', init_increment_b_value,
-                                                      f'[{min_value}', '~', f'{max_value}]')
-                                            else:
-                                                pd_data[dev_column_mean] = pd_data[dev_column_mean].astype('object')
-                                                pd_data.loc[test_type, dev_column_mean] = \
-                                                                                str(init_increment_b_value) + '(F)'
-                                                print(f'[❌][{dev_name_num}]', test_type + ':', init_increment_b_value,
-                                                                            f'[{min_value}', '~', f'{max_value}]')
-                                                self.text_edit.append(f'[{dev_name_num}]' +
-                                                                      f'{test_type}:=' + f'{init_increment_b_value}' +
-                                                                      f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
+                                    # result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
+                                    # if len(result):
+                                    #     result_data = pd_set_data.loc[pd_set_data['名称'] == \
+                                    #                                   str(test_type), '条件'].values[0]
+                                    #     if result_data == '是':
+                                    #         init_increment_b_value = pd_data.loc[test_type, dev_column_mean]
+                                    #         min_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                    #                                     str(test_type), '最小值'].values[0]
+                                    #         max_value = pd_set_data.loc[pd_set_data['名称'] == \
+                                    #                                     str(test_type), '最大值'].values[0]
+                                    #         if int(min_value) < init_increment_b_value < int(max_value):
+                                    #             print('[✅]', test_type + ':', init_increment_b_value,
+                                    #                   f'[{min_value}', '~', f'{max_value}]')
+                                    #         else:
+                                    #             pd_data[dev_column_mean] = pd_data[dev_column_mean].astype('object')
+                                    #             pd_data.loc[test_type, dev_column_mean] = \
+                                    #                                             str(init_increment_b_value) + '(F)'
+                                    #             print(f'[❌][{dev_name_num}]', test_type + ':', init_increment_b_value,
+                                    #                                         f'[{min_value}', '~', f'{max_value}]')
+                                    #             self.text_edit.append(f'[{dev_name_num}]' +
+                                    #                                   f'{test_type}:=' + f'{init_increment_b_value}' +
+                                    #                                   f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                     print("---------------------------------------")
 
 
@@ -688,10 +689,51 @@ class SelectDevice(QWidget):
                                 print("init increment_b_value=", increment_b_value)
                                 pd_data.loc['通用-B通道初始增量', dev_column_mean] = increment_b_value
 
+        #检查条件是否满足
+        print("数据1:", pd_data)
+        self.check_conditions(pd_set_data, pd_data)
+        print("数据2:", pd_data)
 
-        print("数据:",pd_data)
         self.df = pd_data
         self.show_save_dialog()
+
+    @staticmethod
+    def check_conditions(set_df, df):
+        print('开启条件刷选')
+        for r_index, (index, row) in enumerate(df.iterrows()):
+            result = set_df.loc[set_df['名称'] == str(index), '条件']
+            if len(result):
+                result_data = set_df.loc[set_df['名称'] == str(index), '条件'].values[0]
+                if result_data == '是':
+                    min_value = set_df.loc[set_df['名称'] == str(index), '最小值'].values[0]
+                    max_value = set_df.loc[set_df['名称'] == str(index), '最大值'].values[0]
+                    print(index, f'[{min_value}~{max_value}]')
+                    for c_index, value in enumerate(row, 1):
+                        if c_index%3 == 0:
+                            print(c_index, row.iloc[c_index-3], row.iloc[c_index-2])
+                            c_index_min = c_index - 3
+                            c_index_max = c_index - 2
+                            row_min = row.iloc[c_index - 3]
+                            row_max = row.iloc[c_index - 2]
+                            if int(row_min) < int(min_value):
+                                str_value = str(row_min)+'(F)'
+                                col_name = df.columns[c_index_min]
+                                df[col_name] = df[col_name].astype('object')
+                                df.iloc[r_index, c_index_min] = str_value
+                                print(str_value, r_index, c_index_min)
+                            elif int(row_max) > int(max_value):
+                                str_value = str(row_max)+'(F)'
+                                col_name = df.columns[c_index_max]
+                                df[col_name] = df[col_name].astype('object')
+                                df.iloc[r_index, c_index_max] = str_value
+                                print(str_value, r_index, c_index_max)
+
+        # for idx_row, row in df.iterrows():
+        #     print(df.index[idx_row])
+            #
+            # if row['条件'] == '是':
+            #     print(f"{row['名称']}: {row['最小值']}, {row['最大值']}")
+
 
     def show_save_dialog(self):
         #获取当前时间作为文件名
