@@ -268,9 +268,18 @@ class SelectDevice(QWidget):
                             dev_column_min = dev_name_num + '_min'
                             dev_column_max = dev_name_num + '_max'
                             dev_column_mean = dev_name_num + '_mean'
-                            pd_data.loc[:, dev_column_min] = 0
-                            pd_data.loc[:, dev_column_max] = 0
-                            pd_data.loc[:, dev_column_mean] = 0
+                            if dev_column_min in pd_data.columns:
+                                print('已经有：', dev_column_min)
+                            else:
+                                pd_data.loc[:, dev_column_min] = 0
+                            if dev_column_max in pd_data.columns:
+                                print('已经有：', dev_column_max)
+                            else:
+                                pd_data.loc[:, dev_column_max] = 0
+                            if dev_column_mean in pd_data.columns:
+                                print('已经有：', dev_column_mean)
+                            else:
+                                pd_data.loc[:, dev_column_mean] = 0
                             print("开始标记：", dev_name, f"({test_name})")
                         else:
                             sub_line = line.split(sub_string_start, maxsplit=1)
