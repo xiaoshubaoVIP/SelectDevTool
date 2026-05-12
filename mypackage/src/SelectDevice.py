@@ -349,12 +349,18 @@ class SelectDevice(QWidget):
                                                 max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                             str(test_type), '最大值'].values[0]
                                                 if int(min_value) > increment_ration_min:
+                                                    pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
+                                                    pd_data.loc[test_type, dev_column_min] = \
+                                                                                    str(increment_ration_min) + '(F)'
                                                     print(f'[❌][{dev_name_num}]', test_type + ':最小值',
                                                           increment_ration_min, f'[{min_value}', '~', f'{max_value}]')
                                                     self.text_edit.append(f'[{dev_name_num}]'+
                                                         f'{test_type}:最小值='+f'{increment_ration_min}'+
                                                                         f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                                 elif int(max_value) < increment_ration_max:
+                                                    pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
+                                                    pd_data.loc[test_type, dev_column_max] = \
+                                                                                    str(increment_ration_max) + '(F)'
                                                     print(f'[❌][{dev_name_num}]', test_type + ':最大值',
                                                           increment_ration_max, f'[{min_value}', '~', f'{max_value}]')
                                                     self.text_edit.append(f'[{dev_name_num}]'+
@@ -385,12 +391,18 @@ class SelectDevice(QWidget):
                                                 max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                             str(test_type), '最大值'].values[0]
                                                 if int(min_value) > ration_of_change_min:
+                                                    pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
+                                                    pd_data.loc[test_type, dev_column_min] = \
+                                                                                    str(ration_of_change_min) + '(F)'
                                                     print(f'[❌][{dev_name_num}]', test_type + ':最小值',
                                                           ration_of_change_min, f'[{min_value}', '~', f'{max_value}]')
                                                     self.text_edit.append(f'[{dev_name_num}]'+
                                                         f'{test_type}:最小值='+f'{ration_of_change_min}'+
                                                                         f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                                 elif int(max_value) < ration_of_change_max:
+                                                    pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
+                                                    pd_data.loc[test_type, dev_column_max] = \
+                                                                                    str(ration_of_change_max) + '(F)'
                                                     print(f'[❌][{dev_name_num}]', test_type + ':最大值',
                                                           ration_of_change_max, f'[{min_value}', '~', f'{max_value}]')
                                                     self.text_edit.append(f'[{dev_name_num}]'+
@@ -420,12 +432,16 @@ class SelectDevice(QWidget):
                                                 max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                             str(test_type), '最大值'].values[0]
                                                 if int(min_value) > rise_cnt_min:
+                                                    pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
+                                                    pd_data.loc[test_type, dev_column_min] = str(rise_cnt_min) + '(F)'
                                                     print(f'[❌][{dev_name_num}]', test_type + ':最小值', rise_cnt_min,
                                                           f'[{min_value}', '~', f'{max_value}]')
                                                     self.text_edit.append(f'[{dev_name_num}]'+
                                                         f'{test_type}:最小值='+f'{rise_cnt_min}'+
                                                                         f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                                 elif int(max_value) < rise_cnt_max:
+                                                    pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
+                                                    pd_data.loc[test_type, dev_column_max] = str(rise_cnt_max)+'(F)'
                                                     print(f'[❌][{dev_name_num}]', test_type + ':最大值', rise_cnt_max,
                                                           f'[{min_value}', '~', f'{max_value}]')
                                                     self.text_edit.append(f'[{dev_name_num}]'+
@@ -456,12 +472,16 @@ class SelectDevice(QWidget):
                                                 max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                             str(test_type), '最大值'].values[0]
                                                 if int(min_value) > average_min:
+                                                    pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
+                                                    pd_data.loc[test_type, dev_column_min] = str(average_min) + '(F)'
                                                     print(f'[❌][{dev_name_num}]', test_type + ':最小值', average_min,
                                                           f'[{min_value}', '~', f'{max_value}]')
                                                     self.text_edit.append(f'[{dev_name_num}]'+
                                                         f'{test_type}:最小值='+f'{average_min}'+
                                                                         f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                                 elif int(max_value) < average_max:
+                                                    pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
+                                                    pd_data.loc[test_type, dev_column_max] = str(average_max)+'(F)'
                                                     print(f'[❌][{dev_name_num}]', test_type + ':最大值', average_max,
                                                           f'[{min_value}', '~', f'{max_value}]')
                                                     self.text_edit.append(f'[{dev_name_num}]'+
@@ -491,12 +511,16 @@ class SelectDevice(QWidget):
                                                 max_value = pd_set_data.loc[pd_set_data['名称'] == \
                                                                             str(test_type), '最大值'].values[0]
                                                 if int(min_value) > variance_min:
+                                                    pd_data[dev_column_min] = pd_data[dev_column_min].astype('object')
+                                                    pd_data.loc[test_type, dev_column_min] = str(variance_min) + '(F)'
                                                     print(f'[❌][{dev_name_num}]', test_type + ':最小值', variance_min,
                                                           f'[{min_value}', '~', f'{max_value}]')
                                                     self.text_edit.append(f'[{dev_name_num}]'+
                                                         f'{test_type}:最小值='+f'{variance_min}'+
                                                                         f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                                                 elif int(max_value) < variance_max:
+                                                    pd_data[dev_column_max] = pd_data[dev_column_max].astype('object')
+                                                    pd_data.loc[test_type, dev_column_max] = str(variance_max)+'(F)'
                                                     print(f'[❌][{dev_name_num}]', test_type + ':最大值', variance_max,
                                                           f'[{min_value}', '~', f'{max_value}]')
                                                     self.text_edit.append(f'[{dev_name_num}]' +
@@ -524,6 +548,8 @@ class SelectDevice(QWidget):
                                                 print('[✅]', test_type + ':', cali_value_a, f'[{min_value}', '~',
                                                       f'{max_value}]')
                                             else:
+                                                pd_data[dev_column_mean] = pd_data[dev_column_mean].astype('object')
+                                                pd_data.loc[test_type, dev_column_mean] = str(cali_value_a) + '(F)'
                                                 print(f'[❌][{dev_name_num}]', test_type + ':', cali_value_a,
                                                                             f'[{min_value}', '~', f'{max_value}]')
                                                 self.text_edit.append(f'[{dev_name_num}]' +
@@ -548,6 +574,8 @@ class SelectDevice(QWidget):
                                                 print('[✅]', test_type + ':', cali_value_b, f'[{min_value}', '~',
                                                       f'{max_value}]')
                                             else:
+                                                pd_data[dev_column_mean] = pd_data[dev_column_mean].astype('object')
+                                                pd_data.loc[test_type, dev_column_mean] = str(cali_value_b) + '(F)'
                                                 print(f'[❌][{dev_name_num}]', test_type + ':', cali_value_b,
                                                                             f'[{min_value}', '~', f'{max_value}]')
                                                 self.text_edit.append(f'[{dev_name_num}]' +
@@ -571,6 +599,9 @@ class SelectDevice(QWidget):
                                                 print('[✅]', test_type + ':', init_increment_b_value,
                                                       f'[{min_value}', '~', f'{max_value}]')
                                             else:
+                                                pd_data[dev_column_mean] = pd_data[dev_column_mean].astype('object')
+                                                pd_data.loc[test_type, dev_column_mean] = \
+                                                                                str(init_increment_b_value) + '(F)'
                                                 print(f'[❌][{dev_name_num}]', test_type + ':', init_increment_b_value,
                                                                             f'[{min_value}', '~', f'{max_value}]')
                                                 self.text_edit.append(f'[{dev_name_num}]' +
@@ -677,6 +708,7 @@ class SelectDevice(QWidget):
             # 填充色
             fill_header = PatternFill(start_color='0C9C0C', end_color='0C9C0C', fill_type='solid')
             fill_child_header = PatternFill(start_color='DDD9C4', end_color='DDD9C4', fill_type='solid')
+            fill_warning = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
 
             # 1. 需要先写入值
             rows = dataframe_to_rows(self.df, index=True, header=True)
@@ -709,9 +741,17 @@ class SelectDevice(QWidget):
                 else:
                     for c_idx, value in enumerate(row, 1):
                         # 直接通过单元格坐标写入，而不是 append
-                        wb_s.cell(row=r_idx, column=c_idx, value=value)
+                        cell = wb_s.cell(row=r_idx, column=c_idx, value=value)
+                        if '(F)' in str(cell.value):
+                            # 假设 pd_data['col'] 包含 'name(F)'
+                            #pd_data['col名'] = pd_data['col名'].str.replace('(F)', '', regex=False)
+                            cell.fill = fill_warning
+                            wb_s.cell(row=r_idx, column=c_idx, value=str(value).replace('(F)', ''))
+
+                            header_cell = wb_s.cell(row=1, column=c_idx)
+                            header_cell.fill = fill_warning
                         if c_idx > 1 and (c_idx-2)%3 == 0:
-                            cell = wb_s.cell(row=r_idx, column=c_idx)
+                            # cell = wb_s.cell(row=r_idx, column=c_idx)
                             cell.border = Border(left=Side(style='thin'), right=None, top=None, bottom=None)
                     # for c_idx in range(0, len(columns_list), 3):  # for in循环， 起始值、终止值和步长,2 5 8 11
                     #     cell = wb_s.cell(row=r_idx, column=c_idx + 2)
