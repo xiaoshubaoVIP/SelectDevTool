@@ -292,27 +292,10 @@ class SelectDevice(QWidget):
                         # print(line.split(sub_string_end, maxsplit=1))
                         if test_name == "油烟":
                             test_type = '油烟-结束时红光增量'
+                            pd_data.loc[test_type, dev_column_min] = increment_a_value
+                            pd_data.loc[test_type, dev_column_max] = increment_a_value
                             pd_data.loc[test_type, dev_column_mean] = increment_a_value
                             print('油烟结束时红光增量=', increment_a_value)
-                            result = pd_set_data.loc[pd_set_data['名称'] == str(test_type), '条件']
-                            if len(result):
-                                result_data = pd_set_data.loc[pd_set_data['名称'] == \
-                                                              str(test_type), '条件'].values[0]
-                                if result_data == '是':
-                                    min_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                str(test_type), '最小值'].values[0]
-                                    max_value = pd_set_data.loc[pd_set_data['名称'] == \
-                                                                str(test_type), '最大值'].values[0]
-                                    if int(min_value) < increment_a_value < int(max_value):
-                                        print('[✅]', test_type + ':', increment_a_value, f'[{min_value}',
-                                                                                            '~', f'{max_value}]')
-                                    else:
-                                        pd_data[dev_column_mean] = pd_data[dev_column_mean].astype('object')
-                                        pd_data.loc[test_type, dev_column_mean] = str(increment_a_value) + '(F)'
-                                        print(f'[❌][{dev_name_num}]', test_type + ':', increment_a_value,
-                                                                            f'[{min_value}', '~', f'{max_value}]')
-                                        self.text_edit.append(f'[{dev_name_num}]' + f'{test_type}:=' +
-                                            f'{increment_a_value}' + f'不满足[{min_value}' + '~' + f'{max_value}]⚠️')
                         print("结束标记")
                     elif dev_name is not None:
                         if "Receive" not in line:
@@ -415,11 +398,15 @@ class SelectDevice(QWidget):
                                     #校验L-D(A)
                                     print("通用-A通道校机差值:", cali_value_a)
                                     test_type = '通用-A通道校机差值'
+                                    pd_data.loc[test_type, dev_column_min] = cali_value_a
+                                    pd_data.loc[test_type, dev_column_max] = cali_value_a
                                     pd_data.loc[test_type, dev_column_mean] = cali_value_a
 
                                     #校验L-D(B)
                                     print("通用-B通道校机差值:", cali_value_b)
                                     test_type = '通用-B通道校机差值'
+                                    pd_data.loc[test_type, dev_column_min] = cali_value_b
+                                    pd_data.loc[test_type, dev_column_max] = cali_value_b
                                     pd_data.loc[test_type, dev_column_mean] = cali_value_b
                                     print("---------------------------------------")
 
@@ -433,22 +420,6 @@ class SelectDevice(QWidget):
                             elif increment_b_value > 200 or calc_flag == True:
                                 if not calc_flag:
                                     calc_flag = True
-                                    # 校机L-D差值(A)
-                                    s_value_a = int('0x' + sub_line[s_value_a_bit_start:s_value_a_bit_start + 2] +
-                                                    sub_line[s_value_a_bit_start + 3:s_value_a_bit_start + 5], 16)
-                                    alarm_level_a = int(
-                                        '0x' + sub_line[alarm_level_a_bit_start:alarm_level_a_bit_start + 2] +
-                                        sub_line[alarm_level_a_bit_start + 3:alarm_level_a_bit_start + 5], 16)
-                                    cali_value_a = s_value_a - alarm_level_a
-
-                                    # 校机L-D差值(B)
-                                    s_value_b = int('0x' + sub_line[s_value_b_bit_start:s_value_b_bit_start + 2] +
-                                                    sub_line[s_value_b_bit_start + 3:s_value_b_bit_start + 5], 16)
-                                    alarm_level_b = int(
-                                        '0x' + sub_line[alarm_level_b_bit_start:alarm_level_b_bit_start + 2] +
-                                        sub_line[alarm_level_b_bit_start + 3:alarm_level_b_bit_start + 5], 16)
-                                    cali_value_b = s_value_b - alarm_level_b
-                                    print("cali_L-D(A)", cali_value_a, "cali_L-D(B)", cali_value_b)
                                 else:#重置后第二次开始计算
                                     print("value:", increment_ration_value, increment_a_value, increment_b_value,
                                           ration_of_change_value, rise_cnt_value, average_value, variance_value,
@@ -463,19 +434,35 @@ class SelectDevice(QWidget):
                                         ppm_list.append(ppm_value)
                             elif start_mark_flag:
                                 start_mark_flag = False
+                                #B通道初始增量
                                 print("init increment_b_value=", increment_b_value)
+                                pd_data.loc['通用-B通道初始增量', dev_column_min] = increment_b_value
+                                pd_data.loc['通用-B通道初始增量', dev_column_max] = increment_b_value
                                 pd_data.loc['通用-B通道初始增量', dev_column_mean] = increment_b_value
+                                # 校机L-D差值(A)
+                                s_value_a = int('0x' + sub_line[s_value_a_bit_start:s_value_a_bit_start + 2] +
+                                                sub_line[s_value_a_bit_start + 3:s_value_a_bit_start + 5], 16)
+                                alarm_level_a = int(
+                                    '0x' + sub_line[alarm_level_a_bit_start:alarm_level_a_bit_start + 2] +
+                                    sub_line[alarm_level_a_bit_start + 3:alarm_level_a_bit_start + 5], 16)
+                                cali_value_a = s_value_a - alarm_level_a
+
+                                # 校机L-D差值(B)
+                                s_value_b = int('0x' + sub_line[s_value_b_bit_start:s_value_b_bit_start + 2] +
+                                                sub_line[s_value_b_bit_start + 3:s_value_b_bit_start + 5], 16)
+                                alarm_level_b = int(
+                                    '0x' + sub_line[alarm_level_b_bit_start:alarm_level_b_bit_start + 2] +
+                                    sub_line[alarm_level_b_bit_start + 3:alarm_level_b_bit_start + 5], 16)
+                                cali_value_b = s_value_b - alarm_level_b
+                                print("cali_L-D(A)", cali_value_a, "cali_L-D(B)", cali_value_b)
 
         #检查条件是否满足
         print("数据1:", pd_data)
         self.check_conditions(pd_set_data, pd_data)
-        print("数据2:", pd_data)
 
-        self.df = pd_data
         self.show_save_dialog()
 
-    @staticmethod
-    def check_conditions(set_df, df):
+    def check_conditions(self, set_df, df):
         print('开启条件刷选')
         for r_index, (index, row) in enumerate(df.iterrows()):
             result = set_df.loc[set_df['名称'] == str(index), '条件']
@@ -508,7 +495,9 @@ class SelectDevice(QWidget):
                                 df[col_name] = df[col_name].astype('object')
                                 df.iloc[r_index, c_index_max] = str_value
                                 print(str_value, r_index, c_index_max)
-
+                    #修改需要条件判断的index标签
+                    df = df.rename(index={str(index):str(index)+'(T)'})
+        self.df = df
         # for idx_row, row in df.iterrows():
         #     print(df.index[idx_row])
             #
@@ -606,7 +595,8 @@ class SelectDevice(QWidget):
                         if '(F)' in str(cell.value):
                             # 假设 pd_data['col'] 包含 'name(F)'
                             #pd_data['col名'] = pd_data['col名'].str.replace('(F)', '', regex=False)
-                            wb_s.cell(row=r_idx, column=c_idx, value=str(value).replace('(F)', ''))
+                            #wb_s.cell(row=r_idx, column=c_idx, value=str(value).replace('(F)', ''))
+                            cell.value = str(cell.value).replace('(F)', '')
                             cell.fill = fill_warning
                             cell.alignment = left_align
 
@@ -631,7 +621,16 @@ class SelectDevice(QWidget):
             cell.alignment = Alignment(horizontal='left', vertical='center')
             cell.fill = PatternFill(start_color='C5D9F1', end_color='C5D9F1', fill_type='solid')
 
-            # 4. 设置首列A的宽度
+            # 4. 遍历第一列A，将徐娅测试的index名称标记颜色
+            for cell in wb_s['A'][1:]:
+                if '(T)' in str(cell.value):
+                    cell.fill = PatternFill(start_color='C5D9F1', end_color='C5D9F1', fill_type='solid')
+                    cell.value = str(cell.value).replace('(T)', '')
+                    print(cell.value)
+                # print(cell.value)
+
+
+            # 5. 设置首列A的宽度
             wb_s.column_dimensions['A'].width = 24
 
             wb.save(save_file)
