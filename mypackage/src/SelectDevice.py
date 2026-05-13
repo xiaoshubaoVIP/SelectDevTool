@@ -513,7 +513,7 @@ class SelectDevice(QWidget):
                                     df.iloc[r_index, c_index_max] = str_value
                                     print(str_value, r_index, c_index_max)
                     #修改需要条件判断的index标签
-                    df = df.rename(index={str(index):str(index)+'(T)'})
+                    df = df.rename(index={str(index):str(index)+':['+str(min_value)+'~'+str(max_value)+']'+'(T)'})
         self.df = df
         # for idx_row, row in df.iterrows():
         #     print(df.index[idx_row])
@@ -648,7 +648,7 @@ class SelectDevice(QWidget):
 
 
             # 5. 设置首列A的宽度
-            wb_s.column_dimensions['A'].width = 24
+            wb_s.column_dimensions['A'].width = 32
 
             wb.save(save_file)
             wb.close()
