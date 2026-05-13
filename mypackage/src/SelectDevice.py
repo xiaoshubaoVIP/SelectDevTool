@@ -478,23 +478,40 @@ class SelectDevice(QWidget):
                             print(c_index, row.iloc[c_index-3], row.iloc[c_index-2])
                             c_index_min = c_index - 3
                             c_index_max = c_index - 2
-                            row_min = row.iloc[c_index - 3]
-                            row_max = row.iloc[c_index - 2]
-                            min_value_err_flag = False
-                            if int(row_min) < int(min_value):
-                                min_value_err_flag = True
-                                str_value = str(row_min)+'(F)'
-                                col_name = df.columns[c_index_min]
-                                df[col_name] = df[col_name].astype('object')
-                                df.iloc[r_index, c_index_min] = str_value
-                                print(str_value, r_index, c_index_min)
-                            if int(row_max) > int(max_value) or \
-                                                    (min_value_err_flag == True and int(row_min) >= int(row_max)):
-                                str_value = str(row_max)+'(F)'
-                                col_name = df.columns[c_index_max]
-                                df[col_name] = df[col_name].astype('object')
-                                df.iloc[r_index, c_index_max] = str_value
-                                print(str_value, r_index, c_index_max)
+                            c_index_mean = c_index - 1
+                            row_min = row.iloc[c_index_min]
+                            row_max = row.iloc[c_index_max]
+                            row_mean = row.iloc[c_index_mean]
+                            if int(row_min) == int(row_max):
+                                if  int(min_value) < int(row_mean) < int(max_value):
+                                    print("value OK")
+                                else:
+                                    str_value = str(row_min) + '(F)'
+                                    col_name = df.columns[c_index_min]
+                                    df[col_name] = df[col_name].astype('object')
+                                    df.iloc[r_index, c_index_min] = str_value
+                                    col_name = df.columns[c_index_max]
+                                    df[col_name] = df[col_name].astype('object')
+                                    df.iloc[r_index, c_index_max] = str_value
+                                    col_name = df.columns[c_index_mean]
+                                    df[col_name] = df[col_name].astype('object')
+                                    df.iloc[r_index, c_index_mean] = str_value
+                            else:
+                                min_value_err_flag = False
+                                if int(row_min) < int(min_value):
+                                    min_value_err_flag = True
+                                    str_value = str(row_min)+'(F)'
+                                    col_name = df.columns[c_index_min]
+                                    df[col_name] = df[col_name].astype('object')
+                                    df.iloc[r_index, c_index_min] = str_value
+                                    print(str_value, r_index, c_index_min)
+                                if int(row_max) > int(max_value) or \
+                                                        (min_value_err_flag == True and int(row_min) >= int(row_max)):
+                                    str_value = str(row_max)+'(F)'
+                                    col_name = df.columns[c_index_max]
+                                    df[col_name] = df[col_name].astype('object')
+                                    df.iloc[r_index, c_index_max] = str_value
+                                    print(str_value, r_index, c_index_max)
                     #修改需要条件判断的index标签
                     df = df.rename(index={str(index):str(index)+'(T)'})
         self.df = df

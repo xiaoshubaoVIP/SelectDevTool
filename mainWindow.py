@@ -193,6 +193,7 @@ class MainWindow(QMainWindow):
                     dialog = QFileDialog(self, "打开设置文件")
                     dialog.setDirectory(set_path)
                     dialog.setFileMode(QFileDialog.AnyFile)
+                    dialog.setNameFilter("*.xlsx")
                     dialog.setOption(QFileDialog.ReadOnly)
 
                     if dialog.exec_():
