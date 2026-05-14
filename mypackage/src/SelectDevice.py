@@ -453,17 +453,8 @@ class SelectDevice(QWidget):
 
                                     #校验L-D(A)
                                     print("通用-A通道校机差值:", cali_value_a)
-                                    test_type = '通用-A通道校机差值'
-                                    pd_data.loc[test_type, dev_column_min] = cali_value_a
-                                    pd_data.loc[test_type, dev_column_max] = cali_value_a
-                                    pd_data.loc[test_type, dev_column_mean] = cali_value_a
-
                                     #校验L-D(B)
                                     print("通用-B通道校机差值:", cali_value_b)
-                                    test_type = '通用-B通道校机差值'
-                                    pd_data.loc[test_type, dev_column_min] = cali_value_b
-                                    pd_data.loc[test_type, dev_column_max] = cali_value_b
-                                    pd_data.loc[test_type, dev_column_mean] = cali_value_b
                                     print("---------------------------------------")
 
                                 increment_ration_list.clear()
@@ -568,6 +559,7 @@ class SelectDevice(QWidget):
                                 pd_data.loc['通用-B通道初始增量', dev_column_min] = increment_b_value
                                 pd_data.loc['通用-B通道初始增量', dev_column_max] = increment_b_value
                                 pd_data.loc['通用-B通道初始增量', dev_column_mean] = increment_b_value
+                                
                                 # 校机L-D差值(A)
                                 s_value_a = int('0x' + sub_line[s_value_a_bit_start:s_value_a_bit_start + 2] +
                                                 sub_line[s_value_a_bit_start + 3:s_value_a_bit_start + 5], 16)
@@ -575,6 +567,10 @@ class SelectDevice(QWidget):
                                     '0x' + sub_line[alarm_level_a_bit_start:alarm_level_a_bit_start + 2] +
                                     sub_line[alarm_level_a_bit_start + 3:alarm_level_a_bit_start + 5], 16)
                                 cali_value_a = s_value_a - alarm_level_a
+                                test_type = '通用-A通道校机差值'
+                                pd_data.loc[test_type, dev_column_min] = cali_value_a
+                                pd_data.loc[test_type, dev_column_max] = cali_value_a
+                                pd_data.loc[test_type, dev_column_mean] = cali_value_a
 
                                 # 校机L-D差值(B)
                                 s_value_b = int('0x' + sub_line[s_value_b_bit_start:s_value_b_bit_start + 2] +
@@ -583,6 +579,10 @@ class SelectDevice(QWidget):
                                     '0x' + sub_line[alarm_level_b_bit_start:alarm_level_b_bit_start + 2] +
                                     sub_line[alarm_level_b_bit_start + 3:alarm_level_b_bit_start + 5], 16)
                                 cali_value_b = s_value_b - alarm_level_b
+                                test_type = '通用-B通道校机差值'
+                                pd_data.loc[test_type, dev_column_min] = cali_value_b
+                                pd_data.loc[test_type, dev_column_max] = cali_value_b
+                                pd_data.loc[test_type, dev_column_mean] = cali_value_b
                                 print("cali_L-D(A)", cali_value_a, "cali_L-D(B)", cali_value_b)
 
         #检查条件是否满足
