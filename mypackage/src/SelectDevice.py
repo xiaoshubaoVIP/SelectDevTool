@@ -418,6 +418,17 @@ class SelectDevice(QWidget):
                                         pd_data.loc[test_type, dev_column_max] = rise_cnt_max
                                         pd_data.loc[test_type, dev_column_mean] = rise_cnt_mean
 
+                                    if len(ppm_list) != 0:
+                                        ppm_cnt_min = np.min(ppm_list)
+                                        ppm_cnt_max = np.max(ppm_list)
+                                        ppm_cnt_mean = int(np.mean(ppm_list))
+                                        print("PPM: 均值", ppm_cnt_mean, "最大值:",
+                                              ppm_cnt_max, "最小值:", ppm_cnt_min)
+                                        test_type = str(test_name) + '-PPM'
+                                        pd_data.loc[test_type, dev_column_min] = ppm_cnt_min
+                                        pd_data.loc[test_type, dev_column_max] = ppm_cnt_max
+                                        pd_data.loc[test_type, dev_column_mean] = ppm_cnt_mean
+
                                     if len(average_list) != 0:
                                         average_min = np.min(average_list)
                                         average_max = np.max(average_list)
