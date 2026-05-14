@@ -559,7 +559,7 @@ class SelectDevice(QWidget):
                                 pd_data.loc['通用-B通道初始增量', dev_column_min] = increment_b_value
                                 pd_data.loc['通用-B通道初始增量', dev_column_max] = increment_b_value
                                 pd_data.loc['通用-B通道初始增量', dev_column_mean] = increment_b_value
-                                
+
                                 # 校机L-D差值(A)
                                 s_value_a = int('0x' + sub_line[s_value_a_bit_start:s_value_a_bit_start + 2] +
                                                 sub_line[s_value_a_bit_start + 3:s_value_a_bit_start + 5], 16)
@@ -769,7 +769,7 @@ class SelectDevice(QWidget):
 
             # 3. 合并显示设备号
             wb_s.merge_cells('A1:A2')
-            wb_s['A1'] = '设备号'
+            wb_s['A1'] = '类目\设备号'
             cell = wb_s['A1']
             cell.alignment = Alignment(horizontal='left', vertical='center')
             cell.fill = PatternFill(start_color='C5D9F1', end_color='C5D9F1', fill_type='solid')
