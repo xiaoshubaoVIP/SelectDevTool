@@ -242,13 +242,13 @@ class SelectDevice(QWidget):
         mix_smoke_value_list = []
 
         start_calc_flag = False
+        start_calc_second_flag = False
         mix_test_start_calc_flag = False
         mix_test_end_mark_flag = False
         alarm_flag = False
         start_mark_flag = False
 
         last_mix_test_dev_name_num = None
-        last_dev_name_num = None
         dev_name = None
         dev_column_min = None
         dev_column_max = None
@@ -257,11 +257,12 @@ class SelectDevice(QWidget):
 
         for log_file in log_files:
             file_full_path = str(path + '/' + log_file)
-            with open(file_full_path, "r", encoding="utf-8") as file:
+            with (open(file_full_path, "r", encoding="utf-8") as file):
                 for line in file.readlines():
                     # print(line.strip())  # 使用strip()方法去除换行符
                     sub_string_start = "Graph: mark start "
                     sub_string_end = "Graph: mark end "
+
                     if sub_string_start in line: #开始标记，获取设备编号
                         smoke_box_keyword = ['标准烟雾', 'UL烟雾', '灵敏度', '烟箱']
                         pu_test_keyword = ['PU', '聚氨酯', '海绵', '聚']
@@ -321,66 +322,7 @@ class SelectDevice(QWidget):
                                 print('油烟结束时红光增量=', increment_a_value)
                             elif test_name == "混合烟":
                                 last_mix_test_dev_name_num = dev_name_num
-                        elif end_time - start_time < 10:
-                            if test_name == "混合烟":
-                                if last_mix_test_dev_name_num == dev_name_num:
-                                    last_mix_test_dev_name_num = None
-                                    mix_test_end_mark_flag = True
-                                    print(f'{dev_name_num}:混合烟测试结束')
-                                else:
-                                    start_calc_flag = False
-                                    mix_test_start_calc_flag = False
-                                    mix_test_end_mark_flag = False
-                                    alarm_flag = False
-                                    start_mark_flag = False
-
-                                    last_mix_test_dev_name_num = None
-                                    last_dev_name_num = None
-                                    dev_name = None
-
-                        print(f"{dev_name_num}结束标记")
-                    elif dev_name is not None:
-                        if "Receive" not in line:
-                            continue
-                        sub_line = line.split("Receive: ", maxsplit=1)
-                        sub_line = sub_line[1].replace('"','')
-                        if len(sub_line) > 30:
-                            if (alarm_flag == False) and (int('0x' + sub_line[states_bit_start:states_bit_start+2], 16)
-                                                                          == 0x07):
-                                alarm_flag = True
-                                print("报警了")
-
-                            #增量比值
-                            increment_ration_value = int('0x' + sub_line[increment_bit_start:increment_bit_start+2] +
-                                                        sub_line[increment_bit_start + 3:increment_bit_start + 5], 16)
-                            #增量A
-                            increment_a_value = int('0x' + sub_line[increment_a_bit_start:increment_a_bit_start+2] +
-                                                    sub_line[increment_a_bit_start + 3:increment_a_bit_start + 5], 16)
-                            #增量B
-                            increment_b_value = int('0x' + sub_line[increment_b_bit_start:increment_b_bit_start+2] +
-                                                    sub_line[increment_b_bit_start + 3:increment_b_bit_start + 5], 16)
-                            #比值变化率，有符号
-                            byte_data = bytes.fromhex(sub_line[ration_bit_start:ration_bit_start+2] +
-                                                            sub_line[ration_bit_start + 3:ration_bit_start + 5])
-                            ration_of_change_value = int.from_bytes(byte_data, byteorder='big', signed=True)
-                            #计数
-                            rise_cnt_value = int('0x' + sub_line[rise_bit_start:rise_bit_start+2] +
-                                                            sub_line[rise_bit_start + 3:rise_bit_start + 5], 16)
-                            #均值，有符号
-                            byte_data = bytes.fromhex(sub_line[average_bit_start:average_bit_start+2] +
-                                                            sub_line[average_bit_start + 3:average_bit_start + 5])
-                            average_value = int.from_bytes(byte_data, byteorder='big', signed=True)
-
-                            #方差
-                            variance_value = int('0x' + sub_line[variance_bit_start:variance_bit_start+2] +
-                                                        sub_line[variance_bit_start + 3:variance_bit_start + 5], 16)
-                            #ppm值
-                            ppm_value = int('0x' + sub_line[ppm_bit_start:ppm_bit_start+2] +
-                                                            sub_line[ppm_bit_start + 3:ppm_bit_start + 5], 16)
-
-                            #如果增量比值=0，且校验开启标准=True，则结束计算（混合烟不满足increment_ration_value == 0）
-                            if increment_ration_value == 0 and start_calc_flag == True:
-                                start_calc_flag = False
+                            else:
                                 if len(increment_ration_list) > 2:
                                     print("---------------------------------------")
                                     print(dev_name)
@@ -456,7 +398,65 @@ class SelectDevice(QWidget):
                                     #校验L-D(B)
                                     print("通用-B通道校机差值:", cali_value_b)
                                     print("---------------------------------------")
+                        elif end_time - start_time < 10:
+                            if test_name == "混合烟":
+                                if last_mix_test_dev_name_num == dev_name_num:
+                                    last_mix_test_dev_name_num = None
+                                    mix_test_end_mark_flag = True
+                                    print(f'{dev_name_num}:混合烟测试结束')
+                                else:
+                                    start_calc_flag = False
+                                    mix_test_start_calc_flag = False
+                                    mix_test_end_mark_flag = False
+                                    alarm_flag = False
+                                    start_mark_flag = False
 
+                                    last_mix_test_dev_name_num = None
+                                    dev_name = None
+
+                        print(f"{dev_name_num}结束标记")
+                    elif dev_name is not None:
+                        if "Receive" not in line:
+                            continue
+                        sub_line = line.split("Receive: ", maxsplit=1)
+                        sub_line = sub_line[1].replace('"','')
+                        if len(sub_line) > 30:
+                            if (alarm_flag == False) and (int('0x' + sub_line[states_bit_start:states_bit_start+2], 16)
+                                                                          == 0x07):
+                                alarm_flag = True
+                                print("报警了")
+
+                            #增量比值
+                            increment_ration_value = int('0x' + sub_line[increment_bit_start:increment_bit_start+2] +
+                                                        sub_line[increment_bit_start + 3:increment_bit_start + 5], 16)
+                            #增量A
+                            increment_a_value = int('0x' + sub_line[increment_a_bit_start:increment_a_bit_start+2] +
+                                                    sub_line[increment_a_bit_start + 3:increment_a_bit_start + 5], 16)
+                            #增量B
+                            increment_b_value = int('0x' + sub_line[increment_b_bit_start:increment_b_bit_start+2] +
+                                                    sub_line[increment_b_bit_start + 3:increment_b_bit_start + 5], 16)
+                            #比值变化率，有符号
+                            byte_data = bytes.fromhex(sub_line[ration_bit_start:ration_bit_start+2] +
+                                                            sub_line[ration_bit_start + 3:ration_bit_start + 5])
+                            ration_of_change_value = int.from_bytes(byte_data, byteorder='big', signed=True)
+                            #计数
+                            rise_cnt_value = int('0x' + sub_line[rise_bit_start:rise_bit_start+2] +
+                                                            sub_line[rise_bit_start + 3:rise_bit_start + 5], 16)
+                            #均值，有符号
+                            byte_data = bytes.fromhex(sub_line[average_bit_start:average_bit_start+2] +
+                                                            sub_line[average_bit_start + 3:average_bit_start + 5])
+                            average_value = int.from_bytes(byte_data, byteorder='big', signed=True)
+
+                            #方差
+                            variance_value = int('0x' + sub_line[variance_bit_start:variance_bit_start+2] +
+                                                        sub_line[variance_bit_start + 3:variance_bit_start + 5], 16)
+                            #ppm值
+                            ppm_value = int('0x' + sub_line[ppm_bit_start:ppm_bit_start+2] +
+                                                            sub_line[ppm_bit_start + 3:ppm_bit_start + 5], 16)
+
+                            #如果增量比值=0，且校验开启标准=True，则结束计算（混合烟不满足increment_ration_value == 0）
+                            if increment_ration_value == 0 and start_calc_flag == True:
+                                start_calc_flag = False
                                 increment_ration_list.clear()
                                 ration_of_change_list.clear()
                                 rise_cnt_list.clear()
@@ -467,7 +467,8 @@ class SelectDevice(QWidget):
                             elif increment_ration_value > 0:
                                 if not start_calc_flag:
                                     start_calc_flag = True
-                                else:#重置后第二次开始计算
+                                    start_calc_second_flag = False
+                                elif start_calc_second_flag:#重置后第二次开始计算
                                     print("value:", increment_ration_value, increment_a_value, increment_b_value,
                                           ration_of_change_value, rise_cnt_value, average_value, variance_value,
                                           ppm_value)
@@ -476,7 +477,7 @@ class SelectDevice(QWidget):
                                         if increment_a_value > 300:                 #红光增量>300
                                             if mix_test_start_calc_flag:
                                                 mix_smoke_value_list.append(increment_a_value)
-                                                # print(mix_smoke_value_list)
+                                                # print('mix:', mix_smoke_value_list)
                                                 if len(mix_smoke_value_list) >= 64:
                                                     # 去掉两个最大、最小值
                                                     mix_value_list = self.pop_list_max_min(mix_smoke_value_list)
@@ -488,27 +489,30 @@ class SelectDevice(QWidget):
                                                     mix_smoke_value_list.pop(0)
                                                     # 当最小值的索引号 > 大于最大值索引号时
                                                     if min_index > max_index:
-                                                        min_in_mix_smoke_list = np.min(mix_value_list)
-                                                        pd_data.loc[
-                                                            '混合烟-数组最小值', dev_column_min] = min_in_mix_smoke_list
-                                                        pd_data.loc[
-                                                            '混合烟-数组最小值', dev_column_max] = min_in_mix_smoke_list
-                                                        pd_data.loc[
-                                                            '混合烟-数组最小值', dev_column_mean] = min_in_mix_smoke_list
                                                         max_in_mix_smoke_list = np.max(mix_value_list)
-                                                        pd_data.loc[
-                                                            '混合烟-数组最大值', dev_column_min] = max_in_mix_smoke_list
-                                                        pd_data.loc[
-                                                            '混合烟-数组最大值', dev_column_max] = max_in_mix_smoke_list
-                                                        pd_data.loc[
-                                                            '混合烟-数组最大值', dev_column_mean] = max_in_mix_smoke_list
-                                                        mix_test_start_calc_flag = False
-                                                        print('混合烟-数组最小值: ', min_in_mix_smoke_list)
-                                                        print('混合烟-数组最大值: ', max_in_mix_smoke_list)
+                                                        if increment_a_value >= max_in_mix_smoke_list:
+                                                            pd_data.loc[
+                                                                '混合烟-数组最大值', dev_column_min] = max_in_mix_smoke_list
+                                                            pd_data.loc[
+                                                                '混合烟-数组最大值', dev_column_max] = max_in_mix_smoke_list
+                                                            pd_data.loc[
+                                                                '混合烟-数组最大值', dev_column_mean] = max_in_mix_smoke_list
+
+                                                            min_in_mix_smoke_list = np.min(mix_value_list)
+                                                            pd_data.loc[
+                                                                '混合烟-数组最小值', dev_column_min] = min_in_mix_smoke_list
+                                                            pd_data.loc[
+                                                                '混合烟-数组最小值', dev_column_max] = min_in_mix_smoke_list
+                                                            pd_data.loc[
+                                                                '混合烟-数组最小值', dev_column_mean] = min_in_mix_smoke_list
+
+                                                            mix_test_start_calc_flag = False
+                                                            print('混合烟-数组最小值: ', min_in_mix_smoke_list)
+                                                            print('混合烟-数组最大值: ', max_in_mix_smoke_list)
                                         else:
                                             mix_test_start_calc_flag = True
                                             mix_smoke_value_list.clear()
-                                            
+
                                         #求增量比值和差比值变化率
                                         if mix_test_end_mark_flag:  # 混合烟2次结束标记
                                             dev_name = None
@@ -551,6 +555,9 @@ class SelectDevice(QWidget):
                                             average_list.append(average_value)
                                             variance_list.append(variance_value)
                                             ppm_list.append(ppm_value)
+                                else:
+                                    start_calc_second_flag = True
+
                             elif start_mark_flag:
                                 start_calc_flag = False
                                 start_mark_flag = False
@@ -584,6 +591,13 @@ class SelectDevice(QWidget):
                                 pd_data.loc[test_type, dev_column_max] = cali_value_b
                                 pd_data.loc[test_type, dev_column_mean] = cali_value_b
                                 print("cali_L-D(A)", cali_value_a, "cali_L-D(B)", cali_value_b)
+                    else:
+                        increment_ration_list.clear()
+                        ration_of_change_list.clear()
+                        rise_cnt_list.clear()
+                        average_list.clear()
+                        variance_list.clear()
+                        ppm_list.clear()
 
         #检查条件是否满足
         print("数据1:", pd_data)
