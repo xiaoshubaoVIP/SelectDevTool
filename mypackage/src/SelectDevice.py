@@ -286,9 +286,19 @@ class SelectDevice(QWidget):
                         pattern1 = r'\d+\#'
                         dev_name = re.search(pattern1, str(line))  # 使用 search 更稳妥，或者确保 findall 有结果
                         print('start1:', dev_name)
+
+                        # match = re.search(r'"#([^"/]+)/', str(line))
+                        match = re.search(r'#([^/]+)/', str(line))
+                        backup = None
+                        if match:
+                            backup = str(match.group())
+                            print('backup:', backup)
+
                         if dev_name:
                             start_mark_flag = True
                             dev_name_num = str(dev_name.group(0))
+                            dev_name_num = dev_name_num + str(backup)
+                            print("name:", dev_name_num)
                             dev_column_min = dev_name_num + '_min'
                             dev_column_max = dev_name_num + '_max'
                             dev_column_mean = dev_name_num + '_mean'
@@ -320,6 +330,9 @@ class SelectDevice(QWidget):
                         sensitivity_value = float(sensitivity_match.group(1)) if sensitivity_match else None
 
                         test_type = str(test_name) + '-灵敏度'
+                        pd_data[dev_column_min] = pd_data[dev_column_min].astype('float64')
+                        pd_data[dev_column_max] = pd_data[dev_column_max].astype('float64')
+                        pd_data[dev_column_mean] = pd_data[dev_column_mean].astype('float64')
                         pd_data.loc[test_type, dev_column_min] = sensitivity_value
                         pd_data.loc[test_type, dev_column_max] = sensitivity_value
                         pd_data.loc[test_type, dev_column_mean] = sensitivity_value
@@ -755,11 +768,21 @@ class SelectDevice(QWidget):
                 if r_idx == 1:
                     for c_idx in range(0, len(columns_list)):
                         if c_idx > 1:
-                            print("c_idx", c_idx, len(columns_list))
+                            # print("c_idx", c_idx, len(columns_list), str(columns_list[c_idx - 2]))
                             pattern = r'\d+\#'
                             match = re.search(pattern, str(columns_list[c_idx - 2]))  # 使用 search 更稳妥，或者确保 findall 有结果
+
+                            backup = None
+                            match_backup = re.search(r'(?<=\#)[^/]+(?=/)', str(columns_list[c_idx - 2]))
+                            if match_backup:
+                                backup = str(match_backup.group())
+
                             if match:
-                                wb_s.cell(row=1, column=c_idx, value=match.group(0))
+                                if backup is not None:
+                                    id_value =  str(match.group(0))+str(backup)
+                                else:
+                                    id_value = str(match.group(0))
+                                wb_s.cell(row=1, column=c_idx, value=id_value)
                                 cell = wb_s.cell(row=1, column=c_idx)   #写入数据时，同时设置单元格样式
                                 cell.alignment = align_center
                                 cell.font = font_header
