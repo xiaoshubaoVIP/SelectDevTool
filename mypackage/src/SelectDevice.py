@@ -190,10 +190,10 @@ class SelectDevice(QWidget):
         pd_data = pd.DataFrame()
         #通过修改index属性更改行名称
         pd_data.index = ['通用-A通道校机差值', '通用-B通道校机差值', '通用-B通道初始增量',
-            'UL烟雾-灵敏度', 'UL烟雾-增量比值', 'UL烟雾-比值变化率', 'UL烟雾-计数', 'UL烟雾-PPM', 'UL烟雾-平均值', 'UL烟雾-方差',
-            'PU烟雾-灵敏度', 'PU烟雾-增量比值', 'PU烟雾-比值变化率', 'PU烟雾-计数', 'PU烟雾-PPM', 'PU烟雾-平均值', 'PU烟雾-方差',
-            '油烟-增量比值', '油烟-比值变化率', '油烟-计数', '油烟-PPM', '油烟-平均值',  '油烟-方差', '油烟-结束时红光增量',
-            '混合烟-数组最小值', '混合烟-数组最大值', '混合烟-增量比值', '混合烟-比值变化率']
+            'UL烟雾-灵敏度', 'UL烟雾-角度', 'UL烟雾-增量比值', 'UL烟雾-比值变化率', 'UL烟雾-计数', 'UL烟雾-PPM', 'UL烟雾-平均值', 'UL烟雾-方差',
+            'PU烟雾-灵敏度', 'PU烟雾-角度', 'PU烟雾-增量比值', 'PU烟雾-比值变化率', 'PU烟雾-计数', 'PU烟雾-PPM', 'PU烟雾-平均值', 'PU烟雾-方差',
+            '油烟-灵敏度', '油烟-角度', '油烟-增量比值', '油烟-比值变化率', '油烟-计数', '油烟-PPM', '油烟-平均值',  '油烟-方差', '油烟-结束时红光增量',
+            '混合烟-灵敏度', '混合烟-角度', '混合烟-数组最小值', '混合烟-数组最大值', '混合烟-增量比值', '混合烟-比值变化率']
 
         #设备状态
         states_index = 0
@@ -231,13 +231,13 @@ class SelectDevice(QWidget):
         # 校验差值A，旧串口协议，s值 - 报警阈值(仅未识别烟雾类型前有效)
         s_value_index_a = 9
         s_value_a_bit_start = 12 + s_value_index_a * 3
-        alarm_level_index_a = 3
-        alarm_level_a_bit_start = 12 + alarm_level_index_a * 3
+        alarm_level_index_b = 3
+        alarm_level_b_bit_start = 12 + alarm_level_index_b * 3
         # 校验差值B，旧串口协议，s值 - 报警阈值(仅未识别烟雾类型前有效)
         s_value_index_b = 26
         s_value_b_bit_start = 12 + s_value_index_b * 3
-        alarm_level_index_b = 20
-        alarm_level_b_bit_start = 12 + alarm_level_index_b * 3
+        alarm_level_index_a = 20
+        alarm_level_a_bit_start = 12 + alarm_level_index_a * 3
         # 混合烟数组
         mix_smoke_value_list = []
 
@@ -262,6 +262,7 @@ class SelectDevice(QWidget):
                     # print(line.strip())  # 使用strip()方法去除换行符
                     sub_string_start = "Graph: mark start "
                     sub_string_end = "Graph: mark end "
+                    sub_string_value = "Graph: mark value "
 
                     if sub_string_start in line: #开始标记，获取设备编号
                         smoke_box_keyword = ['标准烟雾', 'UL烟雾', '灵敏度', '烟箱']
@@ -311,6 +312,22 @@ class SelectDevice(QWidget):
                             self.text_edit.append("设备编号不符号要求:" + self.warning.format(f'{err_dev_name}⚠️'))
                             dev_name = None
                             continue
+                    elif sub_string_value in line:  # 结束标记
+                        angle_match = re.search(r'angle:(\d+)', str(line))
+                        angle_value = int(angle_match.group(1)) if angle_match else None
+
+                        sensitivity_match = re.search(r'sensity:([\d.]+)', str(line))
+                        sensitivity_value = float(sensitivity_match.group(1)) if sensitivity_match else None
+
+                        test_type = str(test_name) + '-灵敏度'
+                        pd_data.loc[test_type, dev_column_min] = sensitivity_value
+                        pd_data.loc[test_type, dev_column_max] = sensitivity_value
+                        pd_data.loc[test_type, dev_column_mean] = sensitivity_value
+
+                        test_type = str(test_name) + '-角度'
+                        pd_data.loc[test_type, dev_column_min] = angle_value
+                        pd_data.loc[test_type, dev_column_max] = angle_value
+                        pd_data.loc[test_type, dev_column_mean] = angle_value
                     elif sub_string_end in line: #结束标记
                         end_time = self.get_timestamp(str(line))
                         if end_time - start_time > 60:
@@ -430,11 +447,13 @@ class SelectDevice(QWidget):
                             increment_ration_value = int('0x' + sub_line[increment_bit_start:increment_bit_start+2] +
                                                         sub_line[increment_bit_start + 3:increment_bit_start + 5], 16)
                             #增量A
-                            increment_a_value = int('0x' + sub_line[increment_a_bit_start:increment_a_bit_start+2] +
-                                                    sub_line[increment_a_bit_start + 3:increment_a_bit_start + 5], 16)
+                            byte_data = bytes.fromhex(sub_line[increment_a_bit_start:increment_a_bit_start+2] +
+                                                    sub_line[increment_a_bit_start + 3:increment_a_bit_start + 5])
+                            increment_a_value = int.from_bytes(byte_data, byteorder='big', signed=True)
                             #增量B
-                            increment_b_value = int('0x' + sub_line[increment_b_bit_start:increment_b_bit_start+2] +
-                                                    sub_line[increment_b_bit_start + 3:increment_b_bit_start + 5], 16)
+                            byte_data = bytes.fromhex(sub_line[increment_b_bit_start:increment_b_bit_start+2] +
+                                                    sub_line[increment_b_bit_start + 3:increment_b_bit_start + 5])
+                            increment_b_value = int.from_bytes(byte_data, byteorder='big', signed=True)
                             #比值变化率，有符号
                             byte_data = bytes.fromhex(sub_line[ration_bit_start:ration_bit_start+2] +
                                                             sub_line[ration_bit_start + 3:ration_bit_start + 5])
@@ -555,6 +574,7 @@ class SelectDevice(QWidget):
                                             average_list.append(average_value)
                                             variance_list.append(variance_value)
                                             ppm_list.append(ppm_value)
+                                            print("increment a < 380")
                                 else:
                                     start_calc_second_flag = True
 
@@ -563,9 +583,10 @@ class SelectDevice(QWidget):
                                 start_mark_flag = False
                                 #B通道初始增量
                                 print("init increment_b_value=", increment_b_value)
-                                pd_data.loc['通用-B通道初始增量', dev_column_min] = increment_b_value
-                                pd_data.loc['通用-B通道初始增量', dev_column_max] = increment_b_value
-                                pd_data.loc['通用-B通道初始增量', dev_column_mean] = increment_b_value
+                                test_type = '通用-B通道初始增量'
+                                pd_data.loc[test_type, dev_column_min] = increment_b_value
+                                pd_data.loc[test_type, dev_column_max] = increment_b_value
+                                pd_data.loc[test_type, dev_column_mean] = increment_b_value
 
                                 # 校机L-D差值(A)
                                 s_value_a = int('0x' + sub_line[s_value_a_bit_start:s_value_a_bit_start + 2] +
@@ -583,8 +604,8 @@ class SelectDevice(QWidget):
                                 s_value_b = int('0x' + sub_line[s_value_b_bit_start:s_value_b_bit_start + 2] +
                                                 sub_line[s_value_b_bit_start + 3:s_value_b_bit_start + 5], 16)
                                 alarm_level_b = int(
-                                    '0x' + sub_line[alarm_level_b_bit_start:alarm_level_b_bit_start + 2] +
-                                    sub_line[alarm_level_b_bit_start + 3:alarm_level_b_bit_start + 5], 16)
+                                     '0x' + sub_line[alarm_level_b_bit_start:alarm_level_b_bit_start + 2] +
+                                     sub_line[alarm_level_b_bit_start + 3:alarm_level_b_bit_start + 5], 16)
                                 cali_value_b = s_value_b - alarm_level_b
                                 test_type = '通用-B通道校机差值'
                                 pd_data.loc[test_type, dev_column_min] = cali_value_b
@@ -592,6 +613,7 @@ class SelectDevice(QWidget):
                                 pd_data.loc[test_type, dev_column_mean] = cali_value_b
                                 print("cali_L-D(A)", cali_value_a, "cali_L-D(B)", cali_value_b)
                     else:
+                        print("clear data.........")
                         increment_ration_list.clear()
                         ration_of_change_list.clear()
                         rise_cnt_list.clear()
