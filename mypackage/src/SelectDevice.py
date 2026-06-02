@@ -112,17 +112,19 @@ class SelectDevice(QWidget):
         self.line_edit_path.clear()
         files, _ = QFileDialog.getOpenFileNames(
             self,
-            "选择多个文件",
+            "选择log文件",
             "",
-            "所有文件 (*);;文本文件 (*.txt);;图像文件 (*.png *.jpg)"
+            "log文件 (*.log)"
         )
 
         if files:  # 判断用户是否选择了文件（防止点击取消时报错）
             # 将文件路径列表转换为以换行符分隔的字符串并显示
-            self.text_edit.append("选择log文件:")
-            self.text_edit.append(self.valid.format('\n'.join(files)))
-            # self.text_edit.setText('\n'.join(files))
+
             self.selectLogFiles = list(files)
+            self.text_edit.append("选择log文件:")
+            for file in files:
+                self.text_edit.append(self.valid.format(file))
+            # self.text_edit.setText('\n'.join(files))
             print(self.selectLogFiles)
 
     def get_dir(self):
