@@ -293,10 +293,10 @@ class SelectDevice(QWidget):
                             start_mark_flag = True
                             dev_name_num = str(dev_name)
                             dev_name = dev_name_num + str(backup)
-                            print("name:", dev_name_num)
-                            dev_column_min = dev_name_num + '_min'
-                            dev_column_max = dev_name_num + '_max'
-                            dev_column_mean = dev_name_num + '_mean'
+                            print("name:", dev_name)
+                            dev_column_min = dev_name + '_min'
+                            dev_column_max = dev_name + '_max'
+                            dev_column_mean = dev_name + '_mean'
 
                             if dev_column_min in pd_data.columns:
                                 print('已经有：', dev_column_min)
