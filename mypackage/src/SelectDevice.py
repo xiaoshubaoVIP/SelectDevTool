@@ -21,11 +21,20 @@ class SelectDevice(QWidget):
         self.warning = '<font color="orange">{}</font>'
         self.valid = '<font color="green">{}</font>'
         self.normal = '<font color="black">{}</font>'
+
+        #筛选类型
+        self.selectLogFiles = None
         #设置文件
         self.set_file_path = None
 
         #刷选结果
         self.df = pd.DataFrame()
+
+        #实例化按键
+        self.btn_1 = QPushButton("打开需要刷选的log文件")
+        self.btn_1.setStyleSheet("background-color: rgb(225,225,225); color: black;")
+        self.btn_1.setFixedHeight(40)
+        self.btn_1.clicked.connect(self.get_file)
 
         #实例化按键
         self.btn = QPushButton("打开需要刷选的目录")
@@ -86,6 +95,7 @@ class SelectDevice(QWidget):
         stack_layout_2 = QHBoxLayout()
 
         #并加入布局
+        stack_layout_1.addWidget(self.btn_1)
         stack_layout_1.addWidget(self.btn)
         stack_layout_1.addWidget(self.line_edit_path)
         stack_layout_1.addWidget(self.label_device)
@@ -96,36 +106,27 @@ class SelectDevice(QWidget):
         stack_main_layout.addLayout(stack_layout_2)
         self.setLayout(stack_main_layout)
 
+    def get_file(self):
+        # 弹出多选文件对话框
+        self.text_edit.clear()
+        self.line_edit_path.clear()
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "选择多个文件",
+            "",
+            "所有文件 (*);;文本文件 (*.txt);;图像文件 (*.png *.jpg)"
+        )
+
+        if files:  # 判断用户是否选择了文件（防止点击取消时报错）
+            # 将文件路径列表转换为以换行符分隔的字符串并显示
+            self.text_edit.append("选择log文件:")
+            self.text_edit.append(self.valid.format('\n'.join(files)))
+            # self.text_edit.setText('\n'.join(files))
+            self.selectLogFiles = list(files)
+            print(self.selectLogFiles)
 
     def get_dir(self):
-        # # 1. 实例化对话框
-        # dialog = QFileDialog()
-        # # 2. 设置标题
-        # dialog.setWindowTitle("选择包含log文件的目录")
-        # # 3. 关键设置：设置为目录模式
-        # dialog.setFileMode(QFileDialog.Directory)
-        # # 4. 设置过滤器
-        # dialog.setNameFilters(["log文件 (*.log)"])
-        # # # 5. (可选) 强制使用 Qt 原生样式而非系统样式，以确保过滤器在所有系统上表现一致
-        # dialog.setOption(QFileDialog.DontUseNativeDialog, True)
-        #
-        # # 6. 执行对话框
-        # if dialog.exec_():
-        #     # 获取选中的文件夹路径
-        #     selected_dir = dialog.selectedFiles()[0]
-        #     print(f"你选择的文件夹是: {selected_dir}")
-        #
-        #     # 你可以在这里进一步确认该文件夹下是否有你想要的文件
-        #     # 例如检查该目录下是否存在 .xlsx 文件
-        #     dir_obj = QDir(selected_dir)
-        #     files = dir_obj.entryList(["*.log"])
-        #     if files:
-        #         print(f"该目录下包含 {len(files)} 个 log 文件")
-        #         self.current_path = selected_dir
-        #         self.line_edit_path.setText(selected_dir)
-        #     else:
-        #         print("该目录下没有找到 log 文件")
-
+        self.text_edit.clear()
         dialog = QFileDialog()
         dialog.options = QFileDialog.Options()
         dialog.options |= QFileDialog.ShowDirsOnly
@@ -133,29 +134,33 @@ class SelectDevice(QWidget):
         folder_path = dialog.getExistingDirectory(self, "选择文件夹", options=dialog.options)
 
         if folder_path:
+            self.selectLogFiles = None
             print(f"选择的文件夹：{folder_path}")
             self.current_path = folder_path
             self.line_edit_path.setText(folder_path)
 
     def start_button(self):
         print("开始")
-        temp_path = QtCore.QDir(self.line_edit_path.text())
-        path = temp_path.absolutePath()
-        print('目录:'+path)
-        self.text_edit.clear()
-        # self.text_edit.append('目录:'+path)
-        if not os.path.isdir(path):
-            print("错误")
-            self.text_edit.append(self.error.format("目录错误❌"))
-        else:
-            print("正常")
-            self.text_edit.append(self.valid.format("目录正常✅"))
-            txt_files = [file for file in os.listdir(path) if file.endswith(".log")]
-            if len(txt_files) > 0:
-                self.text_edit.append(self.valid.format("目录存在log文件✅"))
-                self.log_process(path, txt_files)
+        if not self.selectLogFiles:#空list, 未选择log文件
+            temp_path = QtCore.QDir(self.line_edit_path.text())
+            path = temp_path.absolutePath()
+            print('目录:'+path)
+            self.text_edit.clear()
+            # self.text_edit.append('目录:'+path)
+            if not os.path.isdir(path):
+                print("错误")
+                self.text_edit.append(self.error.format("目录错误❌"))
             else:
-                self.text_edit.append(self.error.format("未找到log文件❌"))
+                print("正常")
+                self.text_edit.append(self.valid.format("目录正常✅"))
+                txt_files = [file for file in os.listdir(path) if file.endswith(".log")]
+                if len(txt_files) > 0:
+                    self.text_edit.append(self.valid.format("目录存在log文件✅"))
+                    self.log_process(path, txt_files)
+                else:
+                    self.text_edit.append(self.error.format("未找到log文件❌"))
+        else:
+            self.log_process(None, self.selectLogFiles)
 
     @staticmethod
     def get_timestamp(line):
@@ -260,7 +265,10 @@ class SelectDevice(QWidget):
         test_name = None
 
         for log_file in log_files:
-            file_full_path = str(path + '/' + log_file)
+            if path:
+                file_full_path = str(path + '/' + log_file)
+            else:
+                file_full_path = log_file
             with (open(file_full_path, "r", encoding="utf-8") as file):
                 for line in file.readlines():
                     # print(line.strip())  # 使用strip()方法去除换行符
