@@ -169,7 +169,7 @@ class SelectDevice(QWidget):
 
             # 2. 将 datetime 对象转换为时间戳
             timestamp = dt_obj.timestamp()
-            print(timestamp)
+            # print(timestamp)
 
         return timestamp
 
@@ -189,11 +189,15 @@ class SelectDevice(QWidget):
 
         pd_data = pd.DataFrame()
         #通过修改index属性更改行名称
-        pd_data.index = ['通用-A通道校机差值', '通用-B通道校机差值', '通用-B通道初始增量',
-            'UL烟雾-灵敏度', 'UL烟雾-角度', 'UL烟雾-增量比值', 'UL烟雾-比值变化率', 'UL烟雾-计数', 'UL烟雾-PPM', 'UL烟雾-平均值', 'UL烟雾-方差',
-            'PU烟雾-灵敏度', 'PU烟雾-角度', 'PU烟雾-增量比值', 'PU烟雾-比值变化率', 'PU烟雾-计数', 'PU烟雾-PPM', 'PU烟雾-平均值', 'PU烟雾-方差',
-            '油烟-灵敏度', '油烟-角度', '油烟-增量比值', '油烟-比值变化率', '油烟-计数', '油烟-PPM', '油烟-平均值',  '油烟-方差', '油烟-结束时红光增量',
-            '混合烟-灵敏度', '混合烟-角度', '混合烟-数组最小值', '混合烟-数组最大值', '混合烟-增量比值', '混合烟-比值变化率']
+        pd_data.index = ['通用-A通道校机差值', '通用-B通道校机差值',
+            'UL烟雾-A通道初始差值', 'UL烟雾-B通道初始差值', 'UL烟雾-B通道初始增量', 'UL烟雾-灵敏度', 'UL烟雾-角度', 'UL烟雾-增量比值',
+                         'UL烟雾-比值变化率', 'UL烟雾-计数', 'UL烟雾-PPM', 'UL烟雾-平均值', 'UL烟雾-方差',
+            'PU烟雾-A通道初始差值', 'PU烟雾-B通道初始差值', 'PU烟雾-B通道初始增量', 'PU烟雾-灵敏度', 'PU烟雾-角度', 'PU烟雾-增量比值',
+                         'PU烟雾-比值变化率', 'PU烟雾-计数', 'PU烟雾-PPM', 'PU烟雾-平均值', 'PU烟雾-方差',
+            '油烟-A通道初始差值', '油烟-B通道初始差值', '油烟-B通道初始增量', '油烟-灵敏度', '油烟-角度', '油烟-增量比值',
+                         '油烟-比值变化率', '油烟-计数', '油烟-PPM', '油烟-平均值',  '油烟-方差', '油烟-结束时红光增量',
+            '混合烟-A通道初始差值', '混合烟-B通道初始差值', '混合烟-B通道初始增量', '混合烟-灵敏度', '混合烟-角度', '混合烟-数组最小值',
+                         '混合烟-数组最大值', '混合烟-增量比值', '混合烟-比值变化率']
 
         #设备状态
         states_index = 0
@@ -270,24 +274,15 @@ class SelectDevice(QWidget):
                         oil_test_keyword = ['烹饪', '油烟', '油']
                         mix_test_keyword = ['混', '混合', '混合烟']
 
-                        if any(k in line for k in smoke_box_keyword):
-                            test_name = "UL烟雾"
-                        elif any(k in line for k in pu_test_keyword):
-                            test_name = "PU烟雾"
-                        elif any(k in line for k in oil_test_keyword):
-                            test_name = "油烟"
-                        elif any(k in line for k in mix_test_keyword):
-                            test_name = "混合烟"
-                        else:
-                            test_name = "Null"
 
                         start_time = self.get_timestamp(str(line))
 
                         pattern1 = r'\d+\#'
-                        dev_name = re.search(pattern1, str(line))  # 使用 search 更稳妥，或者确保 findall 有结果
-                        print('start1:', dev_name)
+                        match = re.search(pattern1, str(line))  # 使用 search 更稳妥，或者确保 findall 有结果
+                        if match:
+                            dev_name = str(match.group())
+                            print('start1:', dev_name)
 
-                        # match = re.search(r'"#([^"/]+)/', str(line))
                         match = re.search(r'#([^/]+)/', str(line))
                         backup = None
                         if match:
@@ -296,24 +291,40 @@ class SelectDevice(QWidget):
 
                         if dev_name:
                             start_mark_flag = True
-                            dev_name_num = str(dev_name.group(0))
-                            dev_name_num = dev_name_num + str(backup)
+                            dev_name_num = str(dev_name)
+                            dev_name = dev_name_num + str(backup)
                             print("name:", dev_name_num)
                             dev_column_min = dev_name_num + '_min'
                             dev_column_max = dev_name_num + '_max'
                             dev_column_mean = dev_name_num + '_mean'
+
                             if dev_column_min in pd_data.columns:
                                 print('已经有：', dev_column_min)
                             else:
                                 pd_data.loc[:, dev_column_min] = 0
+
                             if dev_column_max in pd_data.columns:
                                 print('已经有：', dev_column_max)
                             else:
                                 pd_data.loc[:, dev_column_max] = 0
+
                             if dev_column_mean in pd_data.columns:
                                 print('已经有：', dev_column_mean)
                             else:
                                 pd_data.loc[:, dev_column_mean] = 0
+
+
+                            if any(k in line for k in smoke_box_keyword):
+                                test_name = "UL烟雾"
+                            elif any(k in line for k in pu_test_keyword):
+                                test_name = "PU烟雾"
+                            elif any(k in line for k in oil_test_keyword):
+                                test_name = "油烟"
+                            elif any(k in line for k in mix_test_keyword):
+                                test_name = "混合烟"
+                            else:
+                                test_name = "Null"
+
                             print("开始标记：", dev_name, f"({test_name})")
                         else:
                             sub_line = line.split(sub_string_start, maxsplit=1)
@@ -322,12 +333,13 @@ class SelectDevice(QWidget):
                             self.text_edit.append("设备编号不符号要求:" + self.warning.format(f'{err_dev_name}⚠️'))
                             dev_name = None
                             continue
-                    elif sub_string_value in line:  # 结束标记
+                    elif sub_string_value in line:  # 数据标记
                         angle_match = re.search(r'angle:(\d+)', str(line))
                         angle_value = int(angle_match.group(1)) if angle_match else None
 
+
                         sensitivity_match = re.search(r'sensity:([\d.]+)', str(line))
-                        sensitivity_value = float(sensitivity_match.group(1)) if sensitivity_match else None
+                        sensitivity_value = float(sensitivity_match.group(1)) if sensitivity_match else 0
 
                         test_type = str(test_name) + '-灵敏度'
                         pd_data[dev_column_min] = pd_data[dev_column_min].astype('float64')
@@ -350,12 +362,11 @@ class SelectDevice(QWidget):
                                 pd_data.loc[test_type, dev_column_max] = increment_a_value
                                 pd_data.loc[test_type, dev_column_mean] = increment_a_value
                                 print('油烟结束时红光增量=', increment_a_value)
-                            elif test_name == "混合烟":
+                                dev_name = None
+                            elif test_name == "混合烟":#混合烟第一次结束
                                 last_mix_test_dev_name_num = dev_name_num
                             else:
                                 if len(increment_ration_list) > 2:
-                                    print("---------------------------------------")
-                                    print(dev_name)
                                     dev_name = None
                                     if len(increment_ration_list) !=0:
                                         increment_ration_min = np.min(increment_ration_list)
@@ -422,13 +433,8 @@ class SelectDevice(QWidget):
                                         pd_data.loc[test_type, dev_column_min] = variance_min
                                         pd_data.loc[test_type, dev_column_max] = variance_max
                                         pd_data.loc[test_type, dev_column_mean] = variance_mean
-
-                                    #校验L-D(A)
-                                    print("通用-A通道校机差值:", cali_value_a)
-                                    #校验L-D(B)
-                                    print("通用-B通道校机差值:", cali_value_b)
                                     print("---------------------------------------")
-                        elif end_time - start_time < 10:
+                        else:
                             if test_name == "混合烟":
                                 if last_mix_test_dev_name_num == dev_name_num:
                                     last_mix_test_dev_name_num = None
@@ -443,7 +449,18 @@ class SelectDevice(QWidget):
 
                                     last_mix_test_dev_name_num = None
                                     dev_name = None
-
+                            else:#非正常测试，数据无效
+                                dev_name = None
+                                print("删除：", dev_column_min, dev_column_max, dev_column_mean)
+                                if dev_column_min in pd_data.columns:
+                                    pd_data.drop(dev_column_min, axis=1, inplace=True)
+                                if dev_column_max in pd_data.columns:
+                                    pd_data.drop(dev_column_max, axis=1, inplace=True)
+                                if dev_column_mean in pd_data.columns:
+                                    pd_data.drop(dev_column_mean, axis=1, inplace=True)
+                                dev_column_min = None
+                                dev_column_max = None
+                                dev_column_mean = None
                         print(f"{dev_name_num}结束标记")
                     elif dev_name is not None:
                         if "Receive" not in line:
@@ -454,7 +471,6 @@ class SelectDevice(QWidget):
                             if (alarm_flag == False) and (int('0x' + sub_line[states_bit_start:states_bit_start+2], 16)
                                                                           == 0x07):
                                 alarm_flag = True
-                                print("报警了")
 
                             #增量比值
                             increment_ration_value = int('0x' + sub_line[increment_bit_start:increment_bit_start+2] +
@@ -501,9 +517,9 @@ class SelectDevice(QWidget):
                                     start_calc_flag = True
                                     start_calc_second_flag = False
                                 elif start_calc_second_flag:#重置后第二次开始计算
-                                    print("value:", increment_ration_value, increment_a_value, increment_b_value,
-                                          ration_of_change_value, rise_cnt_value, average_value, variance_value,
-                                          ppm_value)
+                                    # print("value:", increment_ration_value, increment_a_value, increment_b_value,
+                                    #       ration_of_change_value, rise_cnt_value, average_value, variance_value,
+                                    #       ppm_value)
                                     if test_name == '混合烟':
                                         #A通道>300后数组值
                                         if increment_a_value > 300:                 #红光增量>300
@@ -594,12 +610,14 @@ class SelectDevice(QWidget):
                             elif start_mark_flag:
                                 start_calc_flag = False
                                 start_mark_flag = False
+                                print("---------------------------------------")
+                                print(dev_name)
                                 #B通道初始增量
-                                print("init increment_b_value=", increment_b_value)
-                                test_type = '通用-B通道初始增量'
+                                test_type = str(test_name) + '-B通道初始增量'
                                 pd_data.loc[test_type, dev_column_min] = increment_b_value
                                 pd_data.loc[test_type, dev_column_max] = increment_b_value
                                 pd_data.loc[test_type, dev_column_mean] = increment_b_value
+                                print(test_type, increment_b_value)
 
                                 # 校机L-D差值(A)
                                 s_value_a = int('0x' + sub_line[s_value_a_bit_start:s_value_a_bit_start + 2] +
@@ -608,10 +626,11 @@ class SelectDevice(QWidget):
                                     '0x' + sub_line[alarm_level_a_bit_start:alarm_level_a_bit_start + 2] +
                                     sub_line[alarm_level_a_bit_start + 3:alarm_level_a_bit_start + 5], 16)
                                 cali_value_a = s_value_a - alarm_level_a
-                                test_type = '通用-A通道校机差值'
+                                test_type = str(test_name) + '-A通道初始差值'
                                 pd_data.loc[test_type, dev_column_min] = cali_value_a
                                 pd_data.loc[test_type, dev_column_max] = cali_value_a
                                 pd_data.loc[test_type, dev_column_mean] = cali_value_a
+                                print(test_type, cali_value_a)
 
                                 # 校机L-D差值(B)
                                 s_value_b = int('0x' + sub_line[s_value_b_bit_start:s_value_b_bit_start + 2] +
@@ -620,13 +639,12 @@ class SelectDevice(QWidget):
                                      '0x' + sub_line[alarm_level_b_bit_start:alarm_level_b_bit_start + 2] +
                                      sub_line[alarm_level_b_bit_start + 3:alarm_level_b_bit_start + 5], 16)
                                 cali_value_b = s_value_b - alarm_level_b
-                                test_type = '通用-B通道校机差值'
+                                test_type = str(test_name) + '-B通道初始差值'
                                 pd_data.loc[test_type, dev_column_min] = cali_value_b
                                 pd_data.loc[test_type, dev_column_max] = cali_value_b
                                 pd_data.loc[test_type, dev_column_mean] = cali_value_b
-                                print("cali_L-D(A)", cali_value_a, "cali_L-D(B)", cali_value_b)
+                                print(test_type, cali_value_b)
                     else:
-                        print("clear data.........")
                         increment_ration_list.clear()
                         ration_of_change_list.clear()
                         rise_cnt_list.clear()
@@ -654,8 +672,8 @@ class SelectDevice(QWidget):
             if len(result):
                 result_data = set_df.loc[set_df['名称'] == str(index), '条件'].values[0]
                 if result_data == '是':
-                    min_value = set_df.loc[set_df['名称'] == str(index), '最小值'].values[0]
-                    max_value = set_df.loc[set_df['名称'] == str(index), '最大值'].values[0]
+                    min_value = float(set_df.loc[set_df['名称'] == str(index), '最小值'].values[0])
+                    max_value = float(set_df.loc[set_df['名称'] == str(index), '最大值'].values[0])
                     print(index, f'[{min_value}~{max_value}]')
 
                     for c_index, value in enumerate(row, 1):
@@ -664,11 +682,14 @@ class SelectDevice(QWidget):
                             c_index_min = c_index - 3
                             c_index_max = c_index - 2
                             c_index_mean = c_index - 1
-                            row_min = row.iloc[c_index_min]
-                            row_max = row.iloc[c_index_max]
-                            row_mean = row.iloc[c_index_mean]
-                            if int(row_min) == int(row_max):
-                                if  int(min_value) < int(row_mean) < int(max_value):
+                            row_min = float(row.iloc[c_index_min])
+                            row_max = float(row.iloc[c_index_max])
+                            row_mean = float(row.iloc[c_index_mean])
+
+
+                            print("比较：", min_value, max_value, row_mean)
+                            if row_min == row_max:
+                                if  min_value < row_mean < max_value:
                                     print("value OK")
                                 else:
                                     str_value = str(row_min) + '(F)'
@@ -683,15 +704,14 @@ class SelectDevice(QWidget):
                                     df.iloc[r_index, c_index_mean] = str_value
                             else:
                                 min_value_err_flag = False
-                                if int(row_min) < int(min_value):
+                                if row_min < min_value:
                                     min_value_err_flag = True
                                     str_value = str(row_min)+'(F)'
                                     col_name = df.columns[c_index_min]
                                     df[col_name] = df[col_name].astype('object')
                                     df.iloc[r_index, c_index_min] = str_value
                                     print(str_value, r_index, c_index_min)
-                                if int(row_max) > int(max_value) or \
-                                                        (min_value_err_flag == True and int(row_min) >= int(row_max)):
+                                if row_max > max_value or (min_value_err_flag == True and row_min >= row_max):
                                     str_value = str(row_max)+'(F)'
                                     col_name = df.columns[c_index_max]
                                     df[col_name] = df[col_name].astype('object')
@@ -843,7 +863,7 @@ class SelectDevice(QWidget):
 
 
             # 5. 设置首列A的宽度
-            wb_s.column_dimensions['A'].width = 32
+            wb_s.column_dimensions['A'].width = 40
 
             wb.save(save_file)
             wb.close()
