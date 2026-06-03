@@ -1,6 +1,6 @@
 from PyQt5.QtCore import QThread,pyqtSignal
 import serial
-from requests.compat import chardet
+# from requests.compat import chardet
 
 
 class SerialThread(QThread):

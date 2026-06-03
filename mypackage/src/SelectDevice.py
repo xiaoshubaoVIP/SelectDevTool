@@ -71,7 +71,7 @@ class SelectDevice(QWidget):
         if not os.path.isdir(set_path):
             os.mkdir(set_path)
             print("set文件不存在")
-            self.text_edit.append(self.error.format("请先在setting目录下添加设置文件❌"))
+            self.text_edit.append(self.error.format("请先在setting目录下添加设置文件[ERROR]"))
         else:
             self.set_file_path = Path(set_path + 'setting.xlsx')
             if self.set_file_path.is_file():
@@ -81,13 +81,13 @@ class SelectDevice(QWidget):
                     self.cb.addItems(sheet_names)
 
                     print('set文件存在')
-                    self.text_edit.append(self.valid.format("set文件存在✅"))
+                    self.text_edit.append(self.valid.format("set文件存在[OK]"))
                 except FileNotFoundError as e:
                     print(f"设置文件打开失败: {e}")
-                    self.text_edit.append(self.error.format(f"设置文件打开失败: {e}❌"))
+                    self.text_edit.append(self.error.format(f"设置文件打开失败: {e}[ERROR]"))
             else:
                 print("set文件不存在")
-                self.text_edit.append(self.error.format("设置文件不存在❌"))
+                self.text_edit.append(self.error.format("设置文件不存在[ERROR]"))
 
         #布局
         stack_main_layout = QVBoxLayout()
@@ -151,16 +151,16 @@ class SelectDevice(QWidget):
             # self.text_edit.append('目录:'+path)
             if not os.path.isdir(path):
                 print("错误")
-                self.text_edit.append(self.error.format("目录错误❌"))
+                self.text_edit.append(self.error.format("目录错误[ERROR]"))
             else:
                 print("正常")
-                self.text_edit.append(self.valid.format("目录正常✅"))
+                self.text_edit.append(self.valid.format("目录正常[OK]"))
                 txt_files = [file for file in os.listdir(path) if file.endswith(".log")]
                 if len(txt_files) > 0:
-                    self.text_edit.append(self.valid.format("目录存在log文件✅"))
+                    self.text_edit.append(self.valid.format("目录存在log文件[OK]"))
                     self.log_process(path, txt_files)
                 else:
-                    self.text_edit.append(self.error.format("未找到log文件❌"))
+                    self.text_edit.append(self.error.format("未找到log文件[ERROR]"))
         else:
             self.log_process(None, self.selectLogFiles)
 
@@ -189,9 +189,9 @@ class SelectDevice(QWidget):
             pd_set_data = pd.DataFrame(set_data)
             print(pd_set_data)
 
-            self.text_edit.append(self.valid.format(sheet_name+"配置文件打开✅"))
+            self.text_edit.append(self.valid.format(sheet_name+"配置文件打开[OK]"))
         except FileNotFoundError as e:
-            self.text_edit.append(self.error.format(sheet_name+"配置文件打开❌"))
+            self.text_edit.append(self.error.format(sheet_name+"配置文件打开[ERROR]"))
             return
 
         pd_data = pd.DataFrame()
@@ -340,7 +340,7 @@ class SelectDevice(QWidget):
                             sub_line = line.split(sub_string_start, maxsplit=1)
                             if sub_line[1] in line:
                                 err_dev_name = sub_line[1]
-                            self.text_edit.append("设备编号不符号要求:" + self.warning.format(f'{err_dev_name}⚠️'))
+                            self.text_edit.append("设备编号不符号要求:" + self.warning.format(f'{err_dev_name}[WARNING]'))
                             dev_name = None
                             continue
                     elif sub_string_value in line:  # 数据标记
@@ -663,7 +663,7 @@ class SelectDevice(QWidget):
                         ppm_list.clear()
 
         #检查条件是否满足
-        print("数据1:", pd_data)
+        # print("数据1:", pd_data)
         self.check_conditions(pd_set_data, pd_data)
 
         self.show_save_dialog()
@@ -684,11 +684,11 @@ class SelectDevice(QWidget):
                 if result_data == '是':
                     min_value = float(set_df.loc[set_df['名称'] == str(index), '最小值'].values[0])
                     max_value = float(set_df.loc[set_df['名称'] == str(index), '最大值'].values[0])
-                    print(index, f'[{min_value}~{max_value}]')
+                    # print(index, f'[{min_value}~{max_value}]')
 
                     for c_index, value in enumerate(row, 1):
                         if c_index%3 == 0:
-                            print(c_index, row.iloc[c_index-3], row.iloc[c_index-2])
+                            # print(c_index, row.iloc[c_index-3], row.iloc[c_index-2])
                             c_index_min = c_index - 3
                             c_index_max = c_index - 2
                             c_index_mean = c_index - 1
@@ -697,10 +697,11 @@ class SelectDevice(QWidget):
                             row_mean = float(row.iloc[c_index_mean])
 
 
-                            print("比较：", min_value, max_value, row_mean)
+                            # print("比较：", min_value, max_value, row_mean)
                             if row_min == row_max:
                                 if  min_value < row_mean < max_value:
-                                    print("value OK")
+                                    pass  # 暂时不实现逻辑
+                                    # print("value OK")
                                 else:
                                     str_value = str(row_min) + '(F)'
                                     col_name = df.columns[c_index_min]
@@ -720,13 +721,13 @@ class SelectDevice(QWidget):
                                     col_name = df.columns[c_index_min]
                                     df[col_name] = df[col_name].astype('object')
                                     df.iloc[r_index, c_index_min] = str_value
-                                    print(str_value, r_index, c_index_min)
+                                    # print(str_value, r_index, c_index_min)
                                 if row_max > max_value or (min_value_err_flag == True and row_min >= row_max):
                                     str_value = str(row_max)+'(F)'
                                     col_name = df.columns[c_index_max]
                                     df[col_name] = df[col_name].astype('object')
                                     df.iloc[r_index, c_index_max] = str_value
-                                    print(str_value, r_index, c_index_max)
+                                    # print(str_value, r_index, c_index_max)
                     #修改需要条件判断的index标签
                     df = df.rename(index={str(index):str(index)+':['+str(min_value)+'~'+str(max_value)+']'+'(T)'})
         self.df = df
@@ -868,28 +869,26 @@ class SelectDevice(QWidget):
                 if '(T)' in str(cell.value):
                     cell.fill = PatternFill(start_color='C5D9F1', end_color='C5D9F1', fill_type='solid')
                     cell.value = str(cell.value).replace('(T)', '')
-                    print(cell.value)
+                    # print(cell.value)
                 # print(cell.value)
-
 
             # 5. 设置首列A的宽度
             wb_s.column_dimensions['A'].width = 40
-
             wb.save(save_file)
             wb.close()
-            print("✅ 文件写入成功！")
+            print("文件写入成功！[OK]")
             print(self.df)
         except Exception as e:
-            print(f"❌ 写入失败，错误信息: {e}")
-            self.text_edit.append(self.error.format("写入excel失败，确保文件在关闭状态❌"))
+            print(f"[ERROR]写入失败，错误信息: {e}")
+            self.text_edit.append(self.error.format("写入excel失败，确保文件在关闭状态[ERROR]"))
 
         # 请求完成
         file_name = os.path.basename(save_file)
         print("文件名",file_name)  # 输出: file.txt
-        self.text_edit.append(self.valid.format("刷选完成✅ "))
-        self.text_edit.append(self.valid.format(f"输出文件:{file_name}✅ "))
+        self.text_edit.append(self.valid.format("刷选完成 [OK]"))
+        self.text_edit.append(self.valid.format(f"输出文件::{file_name} [OK]"))
         try:
             os.startfile(save_file)  # Windows系统可用
         except Exception as e:
-            print(f"❌ 打开excel失败: {e}")
-            self.text_edit.append(self.error.format("打开excel失败❌"))
+            print(f"[ERROR]打开excel失败: {e}")
+            self.text_edit.append(self.error.format("打开excel失败[ERROR]"))

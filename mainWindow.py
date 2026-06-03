@@ -1,5 +1,8 @@
+import datetime
+import logging
 import os
 import sys
+from datetime import datetime
 
 import PyQt5.QtCore as QtCore
 
@@ -107,6 +110,21 @@ class MainWindow(QMainWindow):
         self.show()
         self.center()
 
+        # 配置日志写入 exe 同级目录
+        log_file = os.path.join(os.path.dirname(sys.executable), f'crash_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+        logging.basicConfig(
+            filename=log_file,
+            level=logging.DEBUG,
+            format='%(asctime)s [%(levelname)s] %(message)s'
+        )
+
+        # 全局异常捕获：只要崩溃，必定留下痕迹
+        def handle_exception(exc_type, exc_value, exc_traceback):
+            logging.error("未捕获的致命异常:", exc_info=(exc_type, exc_value, exc_traceback))
+
+        sys.excepthook = handle_exception
+
+        logging.info("========== DataSelect.exe 开始启动 ==========")
     # def btn_mod1_clicked(self):
     #     self.Stack.setCurrentIndex(0)
     #     self.btn_mod1.setStyleSheet("background-color: rgb(190,226,224); color: black; border-radius: 0px;")
