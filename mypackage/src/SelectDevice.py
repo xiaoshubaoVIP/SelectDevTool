@@ -137,6 +137,8 @@ class SelectDevice(QWidget):
 
         if folder_path:
             self.selectLogFiles = None
+            self.text_edit.append("选择目录:")
+            self.text_edit.append(self.valid.format(folder_path))
             print(f"选择的文件夹：{folder_path}")
             self.current_path = folder_path
             self.line_edit_path.setText(folder_path)
@@ -209,6 +211,12 @@ class SelectDevice(QWidget):
         #设备状态
         states_index = 0
         states_bit_start = 12 + states_index * 3
+        #校验时差值A
+        cali_diff_a_index = 7
+        cali_diff_a_start = 12 + cali_diff_a_index * 3
+        #校验时差值B
+        cali_diff_b_index = 24
+        cali_diff_b_start = 12 + cali_diff_b_index * 3
         # A增量
         increment_a_index = 17
         increment_a_bit_start = 12 + increment_a_index * 3
@@ -239,12 +247,12 @@ class SelectDevice(QWidget):
         ppm_list = []
         ppm_index = 5
         ppm_bit_start = 12 + ppm_index*3
-        # 校验差值A，旧串口协议，s值 - 报警阈值(仅未识别烟雾类型前有效)
+        # 当前0点差值A，旧串口协议，s值 - 报警阈值(仅未识别烟雾类型前有效)
         s_value_index_a = 9
         s_value_a_bit_start = 12 + s_value_index_a * 3
         alarm_level_index_b = 3
         alarm_level_b_bit_start = 12 + alarm_level_index_b * 3
-        # 校验差值B，旧串口协议，s值 - 报警阈值(仅未识别烟雾类型前有效)
+        # 当前0点差值B，旧串口协议，s值 - 报警阈值(仅未识别烟雾类型前有效)
         s_value_index_b = 26
         s_value_b_bit_start = 12 + s_value_index_b * 3
         alarm_level_index_a = 20
@@ -622,6 +630,25 @@ class SelectDevice(QWidget):
                                 start_mark_flag = False
                                 print("---------------------------------------")
                                 print(dev_name)
+                                # 校验差值L-D(A)
+                                cali_diff_a = int(
+                                    '0x' + sub_line[cali_diff_a_start:cali_diff_a_start + 2] +
+                                                    sub_line[cali_diff_a_start + 3:cali_diff_a_start + 5], 16)
+                                test_type = '通用-A通道校机差值'
+                                pd_data.loc[test_type, dev_column_min] = cali_diff_a
+                                pd_data.loc[test_type, dev_column_max] = cali_diff_a
+                                pd_data.loc[test_type, dev_column_mean] = cali_diff_a
+                                print(test_type, cali_diff_a)
+
+                                cali_diff_b = int(
+                                    '0x' + sub_line[cali_diff_b_start:cali_diff_b_start + 2] +
+                                                    sub_line[cali_diff_b_start + 3:cali_diff_b_start + 5], 16)
+                                test_type = '通用-B通道校机差值'
+                                pd_data.loc[test_type, dev_column_min] = cali_diff_b
+                                pd_data.loc[test_type, dev_column_max] = cali_diff_b
+                                pd_data.loc[test_type, dev_column_mean] = cali_diff_b
+                                print(test_type, cali_diff_b)
+
                                 #B通道初始增量
                                 test_type = str(test_name) + '-B通道初始增量'
                                 pd_data.loc[test_type, dev_column_min] = increment_b_value
@@ -629,31 +656,31 @@ class SelectDevice(QWidget):
                                 pd_data.loc[test_type, dev_column_mean] = increment_b_value
                                 print(test_type, increment_b_value)
 
-                                # 校机L-D差值(A)
+                                # 当前0点差值(A)
                                 s_value_a = int('0x' + sub_line[s_value_a_bit_start:s_value_a_bit_start + 2] +
                                                 sub_line[s_value_a_bit_start + 3:s_value_a_bit_start + 5], 16)
                                 alarm_level_a = int(
                                     '0x' + sub_line[alarm_level_a_bit_start:alarm_level_a_bit_start + 2] +
                                     sub_line[alarm_level_a_bit_start + 3:alarm_level_a_bit_start + 5], 16)
-                                cali_value_a = s_value_a - alarm_level_a
+                                current_value_diff_a = s_value_a - alarm_level_a
                                 test_type = str(test_name) + '-A通道初始差值'
-                                pd_data.loc[test_type, dev_column_min] = cali_value_a
-                                pd_data.loc[test_type, dev_column_max] = cali_value_a
-                                pd_data.loc[test_type, dev_column_mean] = cali_value_a
-                                print(test_type, cali_value_a)
+                                pd_data.loc[test_type, dev_column_min] = current_value_diff_a
+                                pd_data.loc[test_type, dev_column_max] = current_value_diff_a
+                                pd_data.loc[test_type, dev_column_mean] = current_value_diff_a
+                                print(test_type, current_value_diff_a)
 
-                                # 校机L-D差值(B)
+                                # 当前0点差值(B)
                                 s_value_b = int('0x' + sub_line[s_value_b_bit_start:s_value_b_bit_start + 2] +
                                                 sub_line[s_value_b_bit_start + 3:s_value_b_bit_start + 5], 16)
                                 alarm_level_b = int(
                                      '0x' + sub_line[alarm_level_b_bit_start:alarm_level_b_bit_start + 2] +
                                      sub_line[alarm_level_b_bit_start + 3:alarm_level_b_bit_start + 5], 16)
-                                cali_value_b = s_value_b - alarm_level_b
+                                current_value_diff_b = s_value_b - alarm_level_b
                                 test_type = str(test_name) + '-B通道初始差值'
-                                pd_data.loc[test_type, dev_column_min] = cali_value_b
-                                pd_data.loc[test_type, dev_column_max] = cali_value_b
-                                pd_data.loc[test_type, dev_column_mean] = cali_value_b
-                                print(test_type, cali_value_b)
+                                pd_data.loc[test_type, dev_column_min] = current_value_diff_b
+                                pd_data.loc[test_type, dev_column_max] = current_value_diff_b
+                                pd_data.loc[test_type, dev_column_mean] = current_value_diff_b
+                                print(test_type, current_value_diff_b)
                     else:
                         increment_ration_list.clear()
                         ration_of_change_list.clear()
