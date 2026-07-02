@@ -557,7 +557,7 @@ class IntegratedTester(QWidget):
             [],
             pen=pg.mkPen(highlight_color, width=1),
             symbol="o",
-            symbolSize=3,
+            symbolSize=2,
             symbolPen=pg.mkPen(highlight_color, width=1),
             symbolBrush=pg.mkBrush(highlight_color),
             pxMode=True,
@@ -832,9 +832,9 @@ class IntegratedTester(QWidget):
         curve = pg.PlotDataItem(
             [],
             [],
-            pen=pg.mkPen(color, width=0.7),
+            pen=pg.mkPen(color, width=0.5),
             symbol="o",
-            symbolSize=2,
+            symbolSize=1.5,
             symbolPen=pg.mkPen(color, width=1),
             symbolBrush=pg.mkBrush(color),
             pxMode=True,
@@ -891,14 +891,17 @@ class IntegratedTester(QWidget):
             self.append_protocol_log(f"Receive: {bytes_to_hex(frame.raw)}")
             self.consume_frame(frame.timestamp, frame.payload)
 
-    def consume_frame(self, timestamp: int, payload: bytes) -> None:
+    def consume_frame(self, timestamp: int, payload: bytes, update_ui: bool = True) -> None:
         if not payload:
             return
         cmd = payload[0]
         data = payload[1:] if len(payload) > 1 else b""
-        self.update_device_info(cmd, data)
+        if update_ui:
+            self.update_device_info(cmd, data)
         if self.start_timestamp is None:
             self.start_timestamp = timestamp
+        if cmd != 0x02:
+            return
 
         updated = False
         for row, item in enumerate(self.series.values()):
@@ -907,16 +910,44 @@ class IntegratedTester(QWidget):
             if end > len(data):
                 continue
             value = int.from_bytes(data[cfg.offset:end], "big", signed=cfg.signed)
-            item.current = value
-            item.maximum = value if item.maximum is None else max(item.maximum, value)
-            item.minimum = value if item.minimum is None else min(item.minimum, value)
+            self.append_series_value(item, timestamp, value)
+            if update_ui:
+                self.update_table_row(row, item)
+                self.update_curve(item, rescale=False)
+            updated = True
+        if updated and update_ui:
+            self.rescale_y_axis_to_visible_data()
+
+    def append_series_value(self, item: SeriesData, timestamp: int, value: int) -> None:
+        if item.timestamps and item.timestamps[-1] == timestamp:
+            old_value = item.values[-1]
+            item.values[-1] = value
+            if old_value == item.maximum or old_value == item.minimum:
+                self.recalculate_series_limits(item)
+            else:
+                item.maximum = value if item.maximum is None else max(item.maximum, value)
+                item.minimum = value if item.minimum is None else min(item.minimum, value)
+        else:
             item.timestamps.append(timestamp)
             item.values.append(value)
-            self.update_table_row(row, item)
+            item.maximum = value if item.maximum is None else max(item.maximum, value)
+            item.minimum = value if item.minimum is None else min(item.minimum, value)
+        item.current = value
+
+    @staticmethod
+    def recalculate_series_limits(item: SeriesData) -> None:
+        if item.values:
+            item.maximum = max(item.values)
+            item.minimum = min(item.values)
+        else:
+            item.maximum = None
+            item.minimum = None
+
+    def refresh_imported_series_view(self) -> None:
+        for row, item in enumerate(self.series.values()):
             self.update_curve(item, rescale=False)
-            updated = True
-        if updated:
-            self.rescale_y_axis_to_visible_data()
+            self.update_table_row(row, item)
+        self.rescale_y_axis_to_visible_data()
 
     def update_device_info(self, cmd: int, data: bytes) -> None:
         if cmd == 0x01:
@@ -1178,20 +1209,28 @@ class IntegratedTester(QWidget):
         parser = FrameParser()
         imported_marks: List[MarkData] = []
         pending_mark: Optional[MarkData] = None
+        frame_count = 0
+        last_info_payloads: Dict[int, bytes] = {}
         with open(file_path, "r", encoding="utf-8", errors="ignore") as file:
             for line in file:
                 timestamp = extract_log_timestamp(line) or int(time.time())
                 hex_string = extract_receive_hex(line)
                 if hex_string:
                     for frame in parser.feed(hex_to_bytes(hex_string), timestamp):
-                        self.append_protocol_log(f"Receive: {bytes_to_hex(frame.raw)}")
-                        self.consume_frame(frame.timestamp, frame.payload)
+                        if frame.payload:
+                            last_info_payloads[frame.payload[0]] = frame.payload[1:]
+                        self.consume_frame(frame.timestamp, frame.payload, update_ui=False)
+                        frame_count += 1
                     continue
 
                 pending_mark = self.parse_imported_mark_line(line, timestamp, pending_mark, imported_marks)
         if pending_mark and pending_mark.end:
             imported_marks.append(pending_mark)
+        for cmd, data in last_info_payloads.items():
+            self.update_device_info(cmd, data)
+        self.refresh_imported_series_view()
         self.add_imported_marks(imported_marks)
+        self.append_protocol_log(f"Frames:{frame_count} Marks:{len(self.marks)}")
         self.append_protocol_log("导入完成")
 
     def parse_imported_mark_line(
