@@ -690,7 +690,7 @@ class IntegratedTester(QWidget):
         best_points = []
         best_distance = None
         for item in self.series.values():
-            if not item.visible:
+            if not self.is_series_selectable(item):
                 continue
             points = [
                 (ts - self.start_timestamp, value)
@@ -779,7 +779,7 @@ class IntegratedTester(QWidget):
         best_timestamp = None
         best_distance = None
         for item in self.series.values():
-            if not item.visible or not item.timestamps:
+            if not self.is_series_selectable(item) or not item.timestamps:
                 continue
             index = bisect_left(item.timestamps, target)
             for candidate_index in (index - 1, index):
@@ -795,6 +795,10 @@ class IntegratedTester(QWidget):
                     best_x = relative_x
                     best_timestamp = timestamp
         return best_x, best_timestamp
+
+    @staticmethod
+    def is_series_selectable(item: SeriesData) -> bool:
+        return bool(item.visible and item.curve and item.curve.isVisible())
 
     @staticmethod
     def format_axis_number(value: float) -> str:
@@ -1046,7 +1050,7 @@ class IntegratedTester(QWidget):
         values = [
             value
             for item in self.series.values()
-            if item.visible
+            if self.is_series_selectable(item)
             for value in item.values
         ]
         if not values:
