@@ -547,6 +547,7 @@ class IntegratedTester(QWidget):
         self.plot.setBackground("w")
         self.plot.getPlotItem().getViewBox().setBackgroundColor("w")
         self.legend = self.plot.addLegend()
+        self.apply_legend_style()
         self.position_plot_legend()
         self.plot.showGrid(x=False, y=False)
         self.plot.getViewBox().sigRangeChanged.connect(self.on_plot_range_changed)
@@ -684,7 +685,6 @@ class IntegratedTester(QWidget):
     def update_selection_stats(self, left: float, right: float, cursor_y: float) -> None:
         if self.start_timestamp is None:
             return
-        self.rescale_y_axis_to_visible_data()
 
         best_item = None
         best_points = []
@@ -723,7 +723,7 @@ class IntegratedTester(QWidget):
         self.selection_highlight.setData(x_values, y_values)
         self.selection_highlight.setVisible(True)
         self.selection_text.setHtml(
-            f"<span style='font-size:10pt;color:#000;'>"
+            f"<span style='font-size:8pt;color:#000;'>"
             f"名称:{best_item.config.name}&nbsp;&nbsp;"
             f"数量:{count}&nbsp;&nbsp;"
             f"时间:{self.format_duration(duration)}&nbsp;&nbsp;"
@@ -827,6 +827,7 @@ class IntegratedTester(QWidget):
         self.plot.clear()
         self.legend = self.plot.getPlotItem().legend or self.plot.addLegend()
         self.legend.clear()
+        self.apply_legend_style()
 
         config_path = self.setting_dir / "table.ini"
         config = configparser.ConfigParser()
@@ -947,8 +948,6 @@ class IntegratedTester(QWidget):
                 self.update_table_row(row, item)
                 self.update_curve(item, rescale=False)
             updated = True
-        if updated and update_ui:
-            self.rescale_y_axis_to_visible_data()
 
     def append_series_value(self, item: SeriesData, timestamp: int, value: int) -> None:
         if item.timestamps and item.timestamps[-1] == timestamp:
@@ -1106,6 +1105,7 @@ class IntegratedTester(QWidget):
             legend = self.plot.addLegend()
         self.legend = legend
         legend.clear()
+        self.apply_legend_style()
         for item in self.series.values():
             if item.visible and item.curve:
                 legend.addItem(item.curve, item.config.name)
@@ -1114,6 +1114,10 @@ class IntegratedTester(QWidget):
     def position_plot_legend(self) -> None:
         if self.legend:
             self.legend.anchor((1, 0), (1, 0), offset=(-20, 48))
+
+    def apply_legend_style(self) -> None:
+        if self.legend:
+            self.legend.setLabelTextSize("7pt")
 
     def table_item_changed(self, item: QTableWidgetItem) -> None:
         if item.column() != 0:
@@ -1588,6 +1592,7 @@ class IntegratedTester(QWidget):
         self.plot.clear()
         self.legend = self.plot.getPlotItem().legend or self.plot.addLegend()
         self.legend.clear()
+        self.apply_legend_style()
         for row, item in enumerate(self.series.values()):
             item.current = 0
             item.maximum = None
