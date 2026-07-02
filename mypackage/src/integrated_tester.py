@@ -1,6 +1,7 @@
 import configparser
 import math
 import os
+import re
 import time
 from bisect import bisect_left
 from dataclasses import dataclass, field
@@ -46,7 +47,13 @@ from PyQt5.QtWidgets import (
 import pyqtgraph as pg
 from openpyxl import Workbook
 
-from mypackage.src.tester_protocol import FrameParser, bytes_to_hex, iter_log_frames
+from mypackage.src.tester_protocol import (
+    FrameParser,
+    bytes_to_hex,
+    extract_log_timestamp,
+    extract_receive_hex,
+    hex_to_bytes,
+)
 
 
 @dataclass
@@ -548,9 +555,9 @@ class IntegratedTester(QWidget):
         self.selection_highlight = pg.PlotDataItem(
             [],
             [],
-            pen=pg.mkPen(highlight_color, width=2),
+            pen=pg.mkPen(highlight_color, width=1),
             symbol="o",
-            symbolSize=4,
+            symbolSize=3,
             symbolPen=pg.mkPen(highlight_color, width=1),
             symbolBrush=pg.mkBrush(highlight_color),
             pxMode=True,
@@ -825,9 +832,9 @@ class IntegratedTester(QWidget):
         curve = pg.PlotDataItem(
             [],
             [],
-            pen=pg.mkPen(color, width=1),
+            pen=pg.mkPen(color, width=0.7),
             symbol="o",
-            symbolSize=3,
+            symbolSize=2,
             symbolPen=pg.mkPen(color, width=1),
             symbolBrush=pg.mkBrush(color),
             pxMode=True,
@@ -1155,6 +1162,8 @@ class IntegratedTester(QWidget):
             self.import_log(file_path)
 
     def import_log(self, file_path: str) -> None:
+        self.import_log_with_marks(file_path)
+        return
         self.clear_all()
         self.append_protocol_log(f"开始导入: {file_path}")
         with open(file_path, "r", encoding="utf-8", errors="ignore") as file:
@@ -1162,6 +1171,126 @@ class IntegratedTester(QWidget):
                 self.append_protocol_log(f"Receive: {bytes_to_hex(frame.raw)}")
                 self.consume_frame(frame.timestamp, frame.payload)
         self.append_protocol_log("导入完成")
+
+    def import_log_with_marks(self, file_path: str) -> None:
+        self.clear_all()
+        self.append_protocol_log(f"开始导入 {file_path}")
+        parser = FrameParser()
+        imported_marks: List[MarkData] = []
+        pending_mark: Optional[MarkData] = None
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as file:
+            for line in file:
+                timestamp = extract_log_timestamp(line) or int(time.time())
+                hex_string = extract_receive_hex(line)
+                if hex_string:
+                    for frame in parser.feed(hex_to_bytes(hex_string), timestamp):
+                        self.append_protocol_log(f"Receive: {bytes_to_hex(frame.raw)}")
+                        self.consume_frame(frame.timestamp, frame.payload)
+                    continue
+
+                pending_mark = self.parse_imported_mark_line(line, timestamp, pending_mark, imported_marks)
+        if pending_mark and pending_mark.end:
+            imported_marks.append(pending_mark)
+        self.add_imported_marks(imported_marks)
+        self.append_protocol_log("导入完成")
+
+    def parse_imported_mark_line(
+        self,
+        line: str,
+        timestamp: int,
+        pending_mark: Optional[MarkData],
+        imported_marks: List[MarkData],
+    ) -> Optional[MarkData]:
+        start_match = re.search(r'Graph:\s*mark\s+start\s+"([^"]+)"\s+"([^"]+)"', line)
+        if start_match:
+            if pending_mark and pending_mark.end:
+                imported_marks.append(pending_mark)
+            mark = MarkData(name=start_match.group(1), device_id=start_match.group(2), start=timestamp)
+            mark.angle = self.extract_angle_from_device_id(mark.device_id)
+            return mark
+
+        if pending_mark and "Graph: mark value" in line:
+            self.apply_imported_mark_value(pending_mark, line)
+            pending_mark.end = timestamp
+            return pending_mark
+
+        end_match = re.search(r'Graph:\s*mark\s+end\s+"([^"]+)"', line)
+        if pending_mark and end_match:
+            pending_mark.name = end_match.group(1) or pending_mark.name
+            pending_mark.end = pending_mark.end or timestamp
+            imported_marks.append(pending_mark)
+            return None
+
+        return pending_mark
+
+    def apply_imported_mark_value(self, mark: MarkData, line: str) -> None:
+        values = self.parse_imported_mark_value_fields(line)
+        if not values:
+            return
+        angle = values.get("angle") or mark.angle or self.extract_angle_from_device_id(mark.device_id)
+        backup = values.get("backup", "")
+        raw_id = values.get("id", "")
+        if raw_id:
+            mark.device_id = self.compose_imported_device_id(raw_id, backup, angle, mark.device_id)
+        if angle:
+            mark.angle = angle
+        try:
+            if values.get("sensity"):
+                mark.sensitivity = float(values["sensity"])
+        except ValueError:
+            pass
+
+    @staticmethod
+    def parse_imported_mark_value_fields(line: str) -> Dict[str, str]:
+        values: Dict[str, str] = {}
+        for token in re.findall(r'"([^"]+)"', line):
+            if ":" in token:
+                key, value = token.split(":", 1)
+                values[key.strip()] = value.strip()
+        if values:
+            return values
+
+        match = re.search(r"mark\s+value\s+id:(.*?)\s+angle:(\S+)\s+sensity:([0-9.]+)", line)
+        if match:
+            values["id"] = match.group(1).strip()
+            values["angle"] = match.group(2).strip()
+            values["sensity"] = match.group(3).strip()
+        return values
+
+    @staticmethod
+    def extract_angle_from_device_id(device_id: str) -> str:
+        if "/" not in device_id:
+            return ""
+        return device_id.rsplit("/", 1)[1].strip()
+
+    @staticmethod
+    def compose_imported_device_id(raw_id: str, backup: str, angle: str, fallback: str) -> str:
+        raw_id = raw_id.strip().strip('"')
+        if raw_id.endswith("#"):
+            raw_id = raw_id[:-1]
+        if "#" in raw_id and "/" in raw_id:
+            return raw_id
+
+        device = raw_id
+        note = backup.strip()
+        if "#" in raw_id:
+            device, raw_note = raw_id.split("#", 1)
+            note = note or raw_note.strip()
+
+        if not device and fallback:
+            device = fallback.split("#", 1)[0]
+        if not note and "#" in fallback and "/" in fallback:
+            note = fallback.split("#", 1)[1].rsplit("/", 1)[0]
+        angle = angle or IntegratedTester.extract_angle_from_device_id(fallback) or "Null"
+        return f"{device}#{note}/{angle}"
+
+    def add_imported_marks(self, marks: List[MarkData]) -> None:
+        for mark in marks:
+            if mark.end is None or mark.end <= mark.start:
+                continue
+            self.marks.append(mark)
+            self.add_mark_line(mark, is_start=True)
+            self.add_mark_line(mark, is_start=False)
 
     def export_excel_dialog(self) -> None:
         file_path, _ = QFileDialog.getSaveFileName(
