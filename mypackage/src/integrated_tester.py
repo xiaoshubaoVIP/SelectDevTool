@@ -10,7 +10,7 @@ import serial
 import serial.tools.list_ports
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QColor, QPainter, QPen, QTextCursor
+from PyQt5.QtGui import QColor, QFont, QPainter, QPen, QTextCursor
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QAction,
@@ -79,6 +79,9 @@ class MarkData:
     start_line: Optional[pg.InfiniteLine] = None
     end_line: Optional[pg.InfiniteLine] = None
     region: Optional[pg.LinearRegionItem] = None
+    label_text: Optional[pg.TextItem] = None
+    label_base_x_span: float = 1.0
+    label_base_y_span: float = 1.0
 
 
 class AxisZoomViewBox(pg.ViewBox):
@@ -471,7 +474,7 @@ class IntegratedTester(QWidget):
         self.serial_browser = QTextBrowser()
         self.serial_browser.document().setMaximumBlockCount(1500)
         self.text_tabs = QTabWidget()
-        self.text_tabs.addTab(self.protocol_browser, "日志")
+        self.text_tabs.addTab(self.protocol_browser, "协议")
         self.text_tabs.addTab(self.serial_browser, "串口")
         self.send_edit = QLineEdit()
         self.send_button = QPushButton("发送")
@@ -496,6 +499,7 @@ class IntegratedTester(QWidget):
         self.plot.setBackground("w")
         self.plot.getPlotItem().getViewBox().setBackgroundColor("w")
         self.legend = self.plot.addLegend()
+        self.position_plot_legend()
         self.plot.showGrid(x=False, y=False)
         self.plot.getViewBox().sigRangeChanged.connect(self.on_plot_range_changed)
         self.plot.setLabel("bottom", "")
@@ -522,9 +526,9 @@ class IntegratedTester(QWidget):
         self.selection_highlight = pg.PlotDataItem(
             [],
             [],
-            pen=pg.mkPen(highlight_color, width=5),
+            pen=pg.mkPen(highlight_color, width=2),
             symbol="o",
-            symbolSize=7,
+            symbolSize=5,
             symbolPen=pg.mkPen(highlight_color, width=1),
             symbolBrush=pg.mkBrush(highlight_color),
             pxMode=True,
@@ -551,6 +555,7 @@ class IntegratedTester(QWidget):
 
     def on_plot_range_changed(self, *args) -> None:
         self.update_selection_text_position()
+        self.update_mark_label_positions()
         self.update_y_axis_ticks()
 
     def update_y_axis_ticks(self) -> None:
@@ -677,9 +682,9 @@ class IntegratedTester(QWidget):
         curve = pg.PlotDataItem(
             [],
             [],
-            pen=pg.mkPen(color, width=2),
+            pen=pg.mkPen(color, width=1),
             symbol="o",
-            symbolSize=5,
+            symbolSize=4,
             symbolPen=pg.mkPen(color, width=1),
             symbolBrush=pg.mkBrush(color),
             pxMode=True,
@@ -880,6 +885,11 @@ class IntegratedTester(QWidget):
         for item in self.series.values():
             if item.visible and item.curve:
                 legend.addItem(item.curve, item.config.name)
+        self.position_plot_legend()
+
+    def position_plot_legend(self) -> None:
+        if self.legend:
+            self.legend.anchor((1, 0), (1, 0), offset=(-20, 48))
 
     def table_item_changed(self, item: QTableWidgetItem) -> None:
         if item.column() != 0:
@@ -903,9 +913,13 @@ class IntegratedTester(QWidget):
 
         row = self.table.indexAt(pos).row()
         if row >= 0:
+            self.table.selectRow(row)
             edit_action = QAction("编辑", self)
             edit_action.triggered.connect(lambda: self.edit_graph_config(row))
+            delete_action = QAction("删除", self)
+            delete_action.triggered.connect(lambda: self.delete_graph_config(row))
             menu.addAction(edit_action)
+            menu.addAction(delete_action)
 
         menu.addAction(add_action)
         menu.addAction(import_action)
@@ -931,6 +945,30 @@ class IntegratedTester(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             self.save_graph_config(dialog.get_config(), old_name=old_name)
             self.load_graph_configs()
+
+    def delete_graph_config(self, row: int) -> None:
+        name_item = self.table.item(row, 0)
+        if not name_item:
+            return
+        name = name_item.text()
+        reply = QMessageBox.question(
+            self,
+            "删除曲线",
+            f"确认删除“{name}”吗？",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        config_path = self.setting_dir / "table.ini"
+        config = configparser.ConfigParser()
+        config.read(config_path, encoding="utf-8")
+        if config.has_section(name):
+            config.remove_section(name)
+            with open(config_path, "w", encoding="utf-8") as file:
+                config.write(file)
+        self.load_graph_configs()
 
     def save_graph_config(self, graph_config: GraphConfig, old_name: Optional[str] = None) -> None:
         config_path = self.setting_dir / "table.ini"
@@ -1068,6 +1106,65 @@ class IntegratedTester(QWidget):
             region.setZValue(-10)
             self.plot.addItem(region)
             mark.region = region
+            label = pg.TextItem(
+                self.format_mark_label(mark),
+                anchor=(0.5, 1),
+                color=QColor("#222222"),
+                border=pg.mkPen("#888888"),
+                fill=(255, 255, 255, 210),
+            )
+            x_range, y_range = self.plot.getViewBox().viewRange()
+            mark.label_base_x_span = max(abs(x_range[1] - x_range[0]), 1e-9)
+            mark.label_base_y_span = max(abs(y_range[1] - y_range[0]), 1e-9)
+            label.setZValue(25)
+            self.plot.addItem(label, ignoreBounds=True)
+            mark.label_text = label
+            self.update_mark_label_positions()
+
+    @staticmethod
+    def format_mark_label(mark: MarkData) -> str:
+        return f"{mark.name}-{mark.device_id}"
+
+    def update_mark_label_positions(self) -> None:
+        if self.start_timestamp is None or not hasattr(self, "plot"):
+            return
+        x_range, y_range = self.plot.getViewBox().viewRange()
+        y_span = y_range[1] - y_range[0]
+        if y_span <= 0:
+            return
+
+        visible_index = 0
+        for mark in self.marks:
+            if not mark.label_text or mark.end is None:
+                continue
+            start_pos = mark.start - self.start_timestamp
+            end_pos = mark.end - self.start_timestamp
+            left, right = sorted((start_pos, end_pos))
+            if right < x_range[0] or left > x_range[1]:
+                mark.label_text.setVisible(False)
+                continue
+
+            visible_left = max(left, x_range[0])
+            visible_right = min(right, x_range[1])
+            x_pos = (visible_left + visible_right) / 2
+            y_pos = y_range[0] + y_span * (0.02 + visible_index * 0.035)
+            mark.label_text.setText(self.format_mark_label(mark))
+            self.update_mark_label_font(mark, x_range, y_range)
+            mark.label_text.setPos(x_pos, y_pos)
+            mark.label_text.setVisible(True)
+            visible_index += 1
+
+    def update_mark_label_font(self, mark: MarkData, x_range: List[float], y_range: List[float]) -> None:
+        if not mark.label_text:
+            return
+        current_x_span = max(abs(x_range[1] - x_range[0]), 1e-9)
+        current_y_span = max(abs(y_range[1] - y_range[0]), 1e-9)
+        x_scale = mark.label_base_x_span / current_x_span
+        y_scale = mark.label_base_y_span / current_y_span
+        scale = math.sqrt(max(x_scale * y_scale, 1e-9))
+        font_size = max(4.0, min(14.0, 5.0 * scale))
+        font = QFont("Microsoft YaHei", int(round(font_size)))
+        mark.label_text.setFont(font)
 
     def locate_mark(self) -> None:
         target = self.mark_id.text().strip()
