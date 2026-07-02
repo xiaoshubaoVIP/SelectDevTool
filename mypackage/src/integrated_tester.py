@@ -5,6 +5,7 @@ import re
 import time
 from bisect import bisect_left
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -368,6 +369,8 @@ class IntegratedTester(QWidget):
         self.parser = FrameParser()
         self.serial_thread: Optional[SerialReader] = None
         self.log_file_handle = None
+        self.protocol_log_handle = None
+        self.protocol_log_path: Optional[Path] = None
         self.start_timestamp: Optional[int] = None
         self.series: Dict[str, SeriesData] = {}
         self.marks: List[MarkData] = []
@@ -392,6 +395,10 @@ class IntegratedTester(QWidget):
         ]
 
         self._build_ui()
+        self.open_protocol_log_file()
+        app = QtCore.QCoreApplication.instance()
+        if app is not None:
+            app.aboutToQuit.connect(self.close_all_logs)
         self.load_graph_configs()
         self.refresh_ports()
 
@@ -1376,6 +1383,37 @@ class IntegratedTester(QWidget):
         wb.save(file_path)
         QMessageBox.information(self, "导出Excel", "导出完成")
 
+    @staticmethod
+    def split_mark_device_id(device_id: str):
+        raw = (device_id or "").strip()
+        angle = ""
+        if "/" in raw:
+            raw, angle = raw.rsplit("/", 1)
+
+        device = raw
+        backup = ""
+        if "#" in raw:
+            device, backup = raw.split("#", 1)
+
+        return device.strip(), backup.strip(), angle.strip()
+
+    @staticmethod
+    def format_sensitivity_value(value: Optional[float]) -> str:
+        if value is None:
+            return "0"
+        return f"{value:.3f}".rstrip("0").rstrip(".")
+
+    def format_mark_value_log(self, mark: MarkData) -> str:
+        device, backup, angle_from_id = self.split_mark_device_id(mark.device_id)
+        angle = mark.angle or angle_from_id or self.angle_box.currentText()
+        sensitivity = self.format_sensitivity_value(mark.sensitivity)
+        return (
+            f'Graph: mark value "id:{device}#" '
+            f'"angle:{angle}" '
+            f'"sensity:{sensitivity}" '
+            f'"backup:{backup}"'
+        )
+
     def toggle_mark(self) -> None:
         now = int(time.time())
         if self.current_mark:
@@ -1385,10 +1423,8 @@ class IntegratedTester(QWidget):
                 self.current_mark.sensitivity = value
             self.current_mark.angle = self.angle_box.currentText()
             self.add_mark_line(self.current_mark, is_start=False)
-            self.append_protocol_log(
-                f'Graph: mark value id:{self.current_mark.device_id}# '
-                f"angle:{self.current_mark.angle} sensity:{self.current_mark.sensitivity or 0}"
-            )
+            self.append_protocol_log(self.format_mark_value_log(self.current_mark))
+            self.append_protocol_log(f'Graph: mark end "{self.current_mark.name}"')
             self.current_mark = None
             self.mark_button.setText("标记起点")
             return
@@ -1541,8 +1577,65 @@ class IntegratedTester(QWidget):
         if self.serial_thread:
             self.serial_thread.send(self.send_edit.text())
 
+    def open_protocol_log_file(self) -> None:
+        self.log_dir.mkdir(exist_ok=True)
+        self.protocol_log_path = self.next_protocol_log_path()
+        try:
+            self.protocol_log_handle = open(self.protocol_log_path, "a", encoding="utf-8", newline="\n")
+        except OSError as exc:
+            self.protocol_log_handle = None
+            self.protocol_log_path = None
+            self.protocol_browser.append(f"协议日志创建失败: {exc}")
+
+    def next_protocol_log_path(self) -> Path:
+        base_name = datetime.now().strftime("%Y-%m-%d %H.%M")
+        candidate = self.log_dir / f"{base_name}.log"
+        if not candidate.exists():
+            return candidate
+        index = 2
+        while True:
+            candidate = self.log_dir / f"{base_name}_{index}.log"
+            if not candidate.exists():
+                return candidate
+            index += 1
+
     def append_protocol_log(self, text: str) -> None:
-        self.protocol_browser.append(str(text).rstrip())
+        message = str(text).rstrip()
+        self.protocol_browser.append(message)
+        self.write_protocol_log(message)
+
+    def write_protocol_log(self, message: str) -> None:
+        if not self.protocol_log_handle:
+            return
+        lines = message.splitlines() or [""]
+        try:
+            for line in lines:
+                self.protocol_log_handle.write(self.format_protocol_log_line(line))
+            self.protocol_log_handle.flush()
+        except OSError:
+            self.protocol_log_handle.close()
+            self.protocol_log_handle = None
+
+    @staticmethod
+    def format_protocol_log_line(message: str) -> str:
+        text = message.rstrip()
+        if text.startswith("Receive:"):
+            payload = text.split("Receive:", 1)[1].strip()
+            if payload and not (payload.startswith('"') and payload.endswith('"')):
+                text = f'Receive: "{payload}"'
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        return f"[{timestamp} INFO] {text}\n"
+
+    def close_protocol_log_file(self) -> None:
+        if self.protocol_log_handle:
+            self.protocol_log_handle.close()
+            self.protocol_log_handle = None
+
+    def close_all_logs(self) -> None:
+        if self.log_file_handle:
+            self.log_file_handle.close()
+            self.log_file_handle = None
+        self.close_protocol_log_file()
 
     def append_serial_text(self, data: bytes) -> None:
         text = data.decode("utf-8", errors="replace")
@@ -1574,7 +1667,5 @@ class IntegratedTester(QWidget):
     def close(self) -> bool:
         if self.serial_thread and self.serial_thread.running:
             self.serial_thread.stop()
-        if self.log_file_handle:
-            self.log_file_handle.close()
-            self.log_file_handle = None
+        self.close_all_logs()
         return super().close()
