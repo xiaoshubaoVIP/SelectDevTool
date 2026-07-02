@@ -17,7 +17,6 @@ from PyQt5.QtGui import QBrush, QColor, QFont, QPainter, QPen, QTextCursor
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QAction,
-    QCheckBox,
     QComboBox,
     QColorDialog,
     QDialog,
@@ -368,7 +367,6 @@ class IntegratedTester(QWidget):
 
         self.parser = FrameParser()
         self.serial_thread: Optional[SerialReader] = None
-        self.log_file_handle = None
         self.protocol_log_handle = None
         self.protocol_log_path: Optional[Path] = None
         self.start_timestamp: Optional[int] = None
@@ -402,6 +400,27 @@ class IntegratedTester(QWidget):
         self.load_graph_configs()
         self.refresh_ports()
 
+    def load_setting_items(self, section: str, fallback: List[str]) -> List[str]:
+        config_path = self.setting_dir / "setting.ini"
+        if not config_path.exists():
+            return fallback
+
+        config = configparser.ConfigParser()
+        try:
+            config.read(config_path, encoding="utf-8-sig")
+        except configparser.Error:
+            return fallback
+
+        if not config.has_section(section):
+            return fallback
+
+        items = []
+        for _, value in config.items(section):
+            text = value.strip()
+            if text:
+                items.append(text)
+        return items or fallback
+
     def _build_ui(self) -> None:
         main_layout = QVBoxLayout(self)
         uart_layout = QHBoxLayout()
@@ -412,17 +431,17 @@ class IntegratedTester(QWidget):
         self.port_box = QComboBox()
         self.baud_box = QComboBox()
         self.baud_box.addItems(["4800", "9600", "19200", "115200"])
-        self.save_check = QCheckBox("保存数据")
-        self.save_check.stateChanged.connect(self.toggle_raw_log)
+        self.save_button = QPushButton("保存数据")
+        self.save_button.clicked.connect(self.save_serial_text_file)
 
         self.mark_type = QComboBox()
-        self.mark_type.addItems(["UL烟雾", "PU烟雾", "油烟", "混合烟"])
+        self.mark_type.addItems(self.load_setting_items("mark", ["UL烟雾", "PU烟雾", "油烟", "混合烟"]))
         self.mark_id = QLineEdit()
         self.mark_id.setPlaceholderText("设备号")
         self.mark_note = QLineEdit()
         self.mark_note.setPlaceholderText("备注")
         self.angle_box = QComboBox()
-        self.angle_box.addItems(["Null", "0", "45", "90", "135", "180"])
+        self.angle_box.addItems(self.load_setting_items("angle", ["Null", "0", "45", "90", "135", "180", "225", "270", "315"]))
         self.mark_button = QPushButton("标记起点")
         self.mark_button.clicked.connect(self.toggle_mark)
         self.locate_button = QPushButton("定位")
@@ -432,7 +451,7 @@ class IntegratedTester(QWidget):
             self.open_button,
             self.port_box,
             self.baud_box,
-            self.save_check,
+            self.save_button,
         ]:
             uart_layout.addWidget(widget)
         uart_layout.addStretch(1)
@@ -501,15 +520,26 @@ class IntegratedTester(QWidget):
         send_layout.addWidget(self.send_edit)
         send_layout.addWidget(self.send_button)
 
+        text_panel = QWidget()
+        text_panel_layout = QVBoxLayout(text_panel)
+        text_panel_layout.setContentsMargins(0, 0, 0, 0)
+        text_panel_layout.addWidget(self.text_tabs)
+        text_panel_layout.addLayout(send_layout)
+
+        self.left_content_splitter = QSplitter(Qt.Vertical)
+        self.left_content_splitter.addWidget(self.table)
+        self.left_content_splitter.addWidget(text_panel)
+        self.left_content_splitter.setCollapsible(0, False)
+        self.left_content_splitter.setCollapsible(1, False)
+        self.left_content_splitter.setSizes([430, 260])
+
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.addLayout(uart_layout)
         left_layout.addLayout(info_layout)
         left_layout.addLayout(mark_layout)
-        left_layout.addWidget(self.table, 3)
-        left_layout.addWidget(self.text_tabs, 2)
-        left_layout.addLayout(send_layout)
+        left_layout.addWidget(self.left_content_splitter, 1)
 
         self.plot_view = AxisZoomViewBox()
         self.plot_view.selectionChanged.connect(self.handle_plot_selection)
@@ -888,9 +918,6 @@ class IntegratedTester(QWidget):
         self.open_button.setText("关闭串口" if opened else "打开串口")
 
     def on_serial_data(self, data: bytes) -> None:
-        if self.log_file_handle:
-            self.log_file_handle.write(data)
-            self.log_file_handle.flush()
         self.append_serial_text(data)
         for frame in self.parser.feed(data):
             self.append_protocol_log(f"Receive: {bytes_to_hex(frame.raw)}")
@@ -1186,22 +1213,28 @@ class IntegratedTester(QWidget):
         with open(config_path, "w", encoding="utf-8") as file:
             config.write(file)
 
-    def toggle_raw_log(self) -> None:
-        if self.save_check.isChecked():
-            file_path, _ = QFileDialog.getSaveFileName(
-                self,
-                "保存log文件",
-                str(self.log_dir / f"{time.strftime('%Y-%m-%d_%H%M%S')}.log"),
-                "Log Files (*.log)",
-            )
-            if not file_path:
-                self.save_check.setChecked(False)
-                return
-            self.log_file_handle = open(file_path, "ab")
-        else:
-            if self.log_file_handle:
-                self.log_file_handle.close()
-                self.log_file_handle = None
+    def save_serial_text_file(self) -> None:
+        text = self.serial_browser.toPlainText()
+        if not text.strip():
+            QMessageBox.information(self, "保存数据", "串口文本为空")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "保存串口文本",
+            str(self.log_dir / f"{time.strftime('%Y-%m-%d_%H%M%S')}.txt"),
+            "Text Files (*.txt)",
+        )
+        if not file_path:
+            return
+        if not file_path.lower().endswith(".txt"):
+            file_path += ".txt"
+
+        with open(file_path, "w", encoding="utf-8", newline="\n") as file:
+            file.write(text)
+            if text and not text.endswith("\n"):
+                file.write("\n")
+        QMessageBox.information(self, "保存数据", "保存完成")
 
     def import_log_dialog(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(self, "导入log文件", str(self.root), "Log Files (*.log *.txt)")
@@ -1632,9 +1665,6 @@ class IntegratedTester(QWidget):
             self.protocol_log_handle = None
 
     def close_all_logs(self) -> None:
-        if self.log_file_handle:
-            self.log_file_handle.close()
-            self.log_file_handle = None
         self.close_protocol_log_file()
 
     def append_serial_text(self, data: bytes) -> None:
