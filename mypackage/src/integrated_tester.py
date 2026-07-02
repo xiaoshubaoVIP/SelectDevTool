@@ -373,9 +373,7 @@ class IntegratedTester(QWidget):
         self.marks: List[MarkData] = []
         self.current_mark: Optional[MarkData] = None
         self._rescaling_y_axis = False
-        self.mark_label_base_x_span = 1.0
-        self.mark_label_base_y_span = 1.0
-        self.mark_label_base_initialized = False
+        self.mark_label_font = QFont("Microsoft YaHei", 7)
         self.cursor_x: Optional[float] = None
         self.smoke_status_text = ["正常", "校准", "通道1故障", "通道2故障", "水蒸气故障", "EMC故障", "预报", "报警", "静音"]
         self.smoke_type_text = [
@@ -947,6 +945,17 @@ class IntegratedTester(QWidget):
         for row, item in enumerate(self.series.values()):
             self.update_curve(item, rescale=False)
             self.update_table_row(row, item)
+        all_x_values = [
+            timestamp - self.start_timestamp
+            for item in self.series.values()
+            for timestamp in item.timestamps
+        ] if self.start_timestamp is not None else []
+        if all_x_values:
+            left = min(all_x_values)
+            right = max(all_x_values)
+            if left == right:
+                right = left + 1
+            self.plot.setXRange(left, right, padding=0.03)
         self.rescale_y_axis_to_visible_data()
 
     def update_device_info(self, cmd: int, data: bytes) -> None:
@@ -1424,8 +1433,7 @@ class IntegratedTester(QWidget):
                 border=pg.mkPen("#888888"),
                 fill=(255, 255, 255, 210),
             )
-            x_range, y_range = self.plot.getViewBox().viewRange()
-            self.ensure_mark_label_base(x_range, y_range)
+            label.setFont(self.mark_label_font)
             label.setZValue(25)
             self.plot.addItem(label, ignoreBounds=True)
             mark.label_text = label
@@ -1443,7 +1451,6 @@ class IntegratedTester(QWidget):
         if y_span <= 0:
             return
 
-        font = self.create_mark_label_font(x_range, y_range)
         y_pos = y_range[0] + y_span * 0.02
         for mark in self.marks:
             if not mark.label_text or mark.end is None:
@@ -1455,30 +1462,39 @@ class IntegratedTester(QWidget):
                 mark.label_text.setVisible(False)
                 continue
 
-            visible_left = max(left, x_range[0])
-            visible_right = min(right, x_range[1])
-            x_pos = (visible_left + visible_right) / 2
+            x_pos = (left + right) / 2
             mark.label_text.setText(self.format_mark_label(mark))
-            mark.label_text.setFont(font)
+            mark.label_text.setFont(self.mark_label_font)
+            if not self.should_show_mark_label(mark.label_text, left, right, x_pos, x_range):
+                mark.label_text.setVisible(False)
+                continue
             mark.label_text.setPos(x_pos, y_pos)
             mark.label_text.setVisible(True)
 
-    def ensure_mark_label_base(self, x_range: List[float], y_range: List[float]) -> None:
-        if self.mark_label_base_initialized:
-            return
-        self.mark_label_base_x_span = max(abs(x_range[1] - x_range[0]), 1e-9)
-        self.mark_label_base_y_span = max(abs(y_range[1] - y_range[0]), 1e-9)
-        self.mark_label_base_initialized = True
-
-    def create_mark_label_font(self, x_range: List[float], y_range: List[float]) -> QFont:
-        self.ensure_mark_label_base(x_range, y_range)
-        current_x_span = max(abs(x_range[1] - x_range[0]), 1e-9)
-        current_y_span = max(abs(y_range[1] - y_range[0]), 1e-9)
-        x_scale = self.mark_label_base_x_span / current_x_span
-        y_scale = self.mark_label_base_y_span / current_y_span
-        scale = math.sqrt(max(x_scale * y_scale, 1e-9))
-        font_size = max(5.0, min(16.0, 6.0 * scale))
-        return QFont("Microsoft YaHei", int(round(font_size)))
+    def should_show_mark_label(
+        self,
+        label: pg.TextItem,
+        left: float,
+        right: float,
+        x_pos: float,
+        x_range: List[float],
+    ) -> bool:
+        if left < x_range[0] or right > x_range[1]:
+            return False
+        scene_rect = self.plot.getViewBox().sceneBoundingRect()
+        if scene_rect.width() <= 0:
+            return True
+        x_span = max(abs(x_range[1] - x_range[0]), 1e-9)
+        pixels_per_x = scene_rect.width() / x_span
+        label_width_px = label.textItem.boundingRect().width() + 4
+        mark_width_px = (right - left) * pixels_per_x
+        left_space_px = (x_pos - x_range[0]) * pixels_per_x
+        right_space_px = (x_range[1] - x_pos) * pixels_per_x
+        return (
+            mark_width_px >= label_width_px
+            and left_space_px >= label_width_px / 2
+            and right_space_px >= label_width_px / 2
+        )
 
     def locate_mark(self) -> None:
         target = self.mark_id.text().strip()
@@ -1499,7 +1515,6 @@ class IntegratedTester(QWidget):
         self.parser = FrameParser()
         self.marks.clear()
         self.current_mark = None
-        self.mark_label_base_initialized = False
         self.cursor_x = None
         self.plot.clear()
         self.legend = self.plot.getPlotItem().legend or self.plot.addLegend()
