@@ -2,6 +2,7 @@ import configparser
 import math
 import os
 import time
+from bisect import bisect_left
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -9,8 +10,8 @@ from typing import Dict, List, Optional
 import serial
 import serial.tools.list_ports
 from PyQt5 import QtCore
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QColor, QFont, QPainter, QPen, QTextCursor
+from PyQt5.QtCore import QRectF, Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QBrush, QColor, QFont, QPainter, QPen, QTextCursor
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QAction,
@@ -21,6 +22,7 @@ from PyQt5.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QGraphicsRectItem,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -85,7 +87,7 @@ class MarkData:
 
 
 class AxisZoomViewBox(pg.ViewBox):
-    selectionChanged = pyqtSignal(float, float, float, bool)
+    selectionChanged = pyqtSignal(float, float, float, float, bool)
 
     def __init__(self) -> None:
         super().__init__()
@@ -109,7 +111,7 @@ class AxisZoomViewBox(pg.ViewBox):
         if ev.button() == Qt.LeftButton and not (ev.modifiers() & Qt.ControlModifier):
             start = self.mapSceneToView(ev.buttonDownScenePos())
             current = self.mapSceneToView(ev.scenePos())
-            self.selectionChanged.emit(start.x(), current.x(), current.y(), ev.isFinish())
+            self.selectionChanged.emit(start.x(), current.x(), start.y(), current.y(), ev.isFinish())
             ev.accept()
             return
         super().mouseDragEvent(ev, axis=axis)
@@ -364,6 +366,10 @@ class IntegratedTester(QWidget):
         self.marks: List[MarkData] = []
         self.current_mark: Optional[MarkData] = None
         self._rescaling_y_axis = False
+        self.mark_label_base_x_span = 1.0
+        self.mark_label_base_y_span = 1.0
+        self.mark_label_base_initialized = False
+        self.cursor_x: Optional[float] = None
         self.smoke_status_text = ["正常", "校准", "通道1故障", "通道2故障", "水蒸气故障", "EMC故障", "预报", "报警", "静音"]
         self.smoke_type_text = [
             "无",
@@ -510,6 +516,7 @@ class IntegratedTester(QWidget):
         self.plot.getAxis("bottom").setStyle(showValues=False, tickLength=0)
         self.plot.getAxis("left").enableAutoSIPrefix(False)
         self.plot.getViewBox().enableAutoRange(axis=pg.ViewBox.YAxis, enable=False)
+        self.plot.scene().sigMouseMoved.connect(self.handle_plot_mouse_moved)
         self.update_y_axis_ticks()
 
         self.setup_selection_items()
@@ -522,13 +529,28 @@ class IntegratedTester(QWidget):
         main_layout.addWidget(splitter)
 
     def setup_selection_items(self) -> None:
+        self.selection_region = QGraphicsRectItem()
+        self.selection_region.setPen(QPen(Qt.NoPen))
+        self.selection_region.setBrush(QBrush(QColor(120, 120, 120, 18)))
+        self.selection_region.setZValue(2)
+        self.selection_region.setVisible(False)
+        self.plot.addItem(self.selection_region, ignoreBounds=True)
+        self.selection_region_edges = []
+        selection_edge_pen = pg.mkPen("#888888", width=1, style=Qt.DashLine)
+        for _ in range(4):
+            edge = pg.PlotDataItem([], [], pen=selection_edge_pen, antialias=False, clipToView=False)
+            edge.setZValue(3)
+            edge.setVisible(False)
+            self.plot.addItem(edge, ignoreBounds=True)
+            self.selection_region_edges.append(edge)
+
         highlight_color = QColor("#1677ff")
         self.selection_highlight = pg.PlotDataItem(
             [],
             [],
             pen=pg.mkPen(highlight_color, width=2),
             symbol="o",
-            symbolSize=5,
+            symbolSize=4,
             symbolPen=pg.mkPen(highlight_color, width=1),
             symbolBrush=pg.mkBrush(highlight_color),
             pxMode=True,
@@ -547,6 +569,17 @@ class IntegratedTester(QWidget):
         self.plot.addItem(self.selection_text, ignoreBounds=True)
         self.update_selection_text_position()
 
+        self.cursor_line = pg.InfiniteLine(pos=0, angle=90, movable=False)
+        self.cursor_line.setPen(pg.mkPen("#111111", width=1, style=Qt.DotLine))
+        self.cursor_line.setZValue(26)
+        self.cursor_line.setVisible(False)
+        self.plot.addItem(self.cursor_line, ignoreBounds=True)
+
+        self.cursor_text = pg.TextItem(anchor=(0.5, 0), color=QColor("#111111"))
+        self.cursor_text.setZValue(31)
+        self.cursor_text.setVisible(False)
+        self.plot.addItem(self.cursor_text, ignoreBounds=True)
+
     def update_selection_text_position(self, *args) -> None:
         if not hasattr(self, "selection_text"):
             return
@@ -555,6 +588,7 @@ class IntegratedTester(QWidget):
 
     def on_plot_range_changed(self, *args) -> None:
         self.update_selection_text_position()
+        self.update_cursor_text_position()
         self.update_mark_label_positions()
         self.update_y_axis_ticks()
 
@@ -563,12 +597,47 @@ class IntegratedTester(QWidget):
             return
         self.plot.viewport().update()
 
-    def handle_plot_selection(self, start_x: float, end_x: float, cursor_y: float, finished: bool) -> None:
+    def handle_plot_selection(
+        self,
+        start_x: float,
+        end_x: float,
+        start_y: float,
+        cursor_y: float,
+        finished: bool,
+    ) -> None:
         left, right = sorted((start_x, end_x))
         if abs(right - left) <= 1e-9:
             return
+        self.update_selection_region(left, right, start_y, cursor_y)
         if finished:
             self.update_selection_stats(left, right, cursor_y)
+            self.set_selection_region_visible(False)
+
+    def update_selection_region(self, left: float, right: float, start_y: float, end_y: float) -> None:
+        if not hasattr(self, "selection_region"):
+            return
+        bottom, top = sorted((start_y, end_y))
+        if abs(top - bottom) <= 1e-9:
+            _, y_range = self.plot.getViewBox().viewRange()
+            min_height = max(abs(y_range[1] - y_range[0]) * 0.06, 1)
+            bottom = end_y - min_height / 2
+            top = end_y + min_height / 2
+        self.selection_region.setRect(QRectF(left, bottom, right - left, top - bottom))
+        edge_data = [
+            ([left, right], [top, top]),
+            ([left, right], [bottom, bottom]),
+            ([left, left], [bottom, top]),
+            ([right, right], [bottom, top]),
+        ]
+        for edge, (x_values, y_values) in zip(self.selection_region_edges, edge_data):
+            edge.setData(x_values, y_values)
+        self.set_selection_region_visible(True)
+
+    def set_selection_region_visible(self, visible: bool) -> None:
+        if hasattr(self, "selection_region"):
+            self.selection_region.setVisible(visible)
+        for edge in getattr(self, "selection_region_edges", []):
+            edge.setVisible(visible)
 
     def update_selection_stats(self, left: float, right: float, cursor_y: float) -> None:
         if self.start_timestamp is None:
@@ -598,6 +667,7 @@ class IntegratedTester(QWidget):
             self.selection_highlight.setData([], [])
             self.selection_highlight.setVisible(False)
             self.selection_text.setVisible(False)
+            self.set_selection_region_visible(False)
             return
 
         x_values = [point[0] for point in best_points]
@@ -622,6 +692,79 @@ class IntegratedTester(QWidget):
         )
         self.selection_text.setVisible(True)
         self.update_selection_text_position()
+
+    def handle_plot_mouse_moved(self, scene_pos) -> None:
+        if not hasattr(self, "cursor_line"):
+            return
+        view_box = self.plot.getViewBox()
+        if not view_box.sceneBoundingRect().contains(scene_pos):
+            self.cursor_line.setVisible(False)
+            self.cursor_text.setVisible(False)
+            self.cursor_x = None
+            return
+
+        view_pos = view_box.mapSceneToView(scene_pos)
+        x_range, y_range = view_box.viewRange()
+        x_value, timestamp = self.nearest_visible_timestamp(view_pos.x(), x_range)
+        if x_value is None:
+            x_value = view_pos.x()
+        if timestamp is None and self.start_timestamp is not None:
+            timestamp = int(round(self.start_timestamp + x_value))
+        self.cursor_x = x_value
+        self.cursor_line.setPos(x_value)
+        self.cursor_line.setVisible(True)
+        self.cursor_text.setHtml(
+            f"<span style='font-size:9pt;color:#111;'>{self.format_cursor_time(timestamp)}</span>"
+        )
+        self.cursor_text.setPos(x_value, self.cursor_label_y(y_range))
+        self.cursor_text.setVisible(True)
+
+    def update_cursor_text_position(self) -> None:
+        if not hasattr(self, "cursor_text") or self.cursor_x is None:
+            return
+        _, y_range = self.plot.getViewBox().viewRange()
+        self.cursor_text.setPos(self.cursor_x, self.cursor_label_y(y_range))
+
+    @staticmethod
+    def cursor_label_y(y_range: List[float]) -> float:
+        return y_range[1] - (y_range[1] - y_range[0]) * 0.02
+
+    def nearest_visible_timestamp(self, x_value: float, x_range: List[float]) -> tuple[Optional[float], Optional[int]]:
+        if self.start_timestamp is None:
+            return None, None
+        target = self.start_timestamp + x_value
+        best_x = None
+        best_timestamp = None
+        best_distance = None
+        for item in self.series.values():
+            if not item.visible or not item.timestamps:
+                continue
+            index = bisect_left(item.timestamps, target)
+            for candidate_index in (index - 1, index):
+                if candidate_index < 0 or candidate_index >= len(item.timestamps):
+                    continue
+                timestamp = item.timestamps[candidate_index]
+                relative_x = timestamp - self.start_timestamp
+                if relative_x < x_range[0] or relative_x > x_range[1]:
+                    continue
+                distance = abs(relative_x - x_value)
+                if best_distance is None or distance < best_distance:
+                    best_distance = distance
+                    best_x = relative_x
+                    best_timestamp = timestamp
+        return best_x, best_timestamp
+
+    @staticmethod
+    def format_axis_number(value: float) -> str:
+        if abs(value - round(value)) < 1e-9:
+            return str(int(round(value)))
+        return f"{value:.2f}".rstrip("0").rstrip(".")
+
+    @staticmethod
+    def format_cursor_time(timestamp: Optional[int]) -> str:
+        if timestamp is None:
+            return "--"
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
 
     @staticmethod
     def format_duration(seconds: float) -> str:
@@ -684,7 +827,7 @@ class IntegratedTester(QWidget):
             [],
             pen=pg.mkPen(color, width=1),
             symbol="o",
-            symbolSize=4,
+            symbolSize=3,
             symbolPen=pg.mkPen(color, width=1),
             symbolBrush=pg.mkBrush(color),
             pxMode=True,
@@ -1114,8 +1257,7 @@ class IntegratedTester(QWidget):
                 fill=(255, 255, 255, 210),
             )
             x_range, y_range = self.plot.getViewBox().viewRange()
-            mark.label_base_x_span = max(abs(x_range[1] - x_range[0]), 1e-9)
-            mark.label_base_y_span = max(abs(y_range[1] - y_range[0]), 1e-9)
+            self.ensure_mark_label_base(x_range, y_range)
             label.setZValue(25)
             self.plot.addItem(label, ignoreBounds=True)
             mark.label_text = label
@@ -1133,7 +1275,8 @@ class IntegratedTester(QWidget):
         if y_span <= 0:
             return
 
-        visible_index = 0
+        font = self.create_mark_label_font(x_range, y_range)
+        y_pos = y_range[0] + y_span * 0.02
         for mark in self.marks:
             if not mark.label_text or mark.end is None:
                 continue
@@ -1147,24 +1290,27 @@ class IntegratedTester(QWidget):
             visible_left = max(left, x_range[0])
             visible_right = min(right, x_range[1])
             x_pos = (visible_left + visible_right) / 2
-            y_pos = y_range[0] + y_span * (0.02 + visible_index * 0.035)
             mark.label_text.setText(self.format_mark_label(mark))
-            self.update_mark_label_font(mark, x_range, y_range)
+            mark.label_text.setFont(font)
             mark.label_text.setPos(x_pos, y_pos)
             mark.label_text.setVisible(True)
-            visible_index += 1
 
-    def update_mark_label_font(self, mark: MarkData, x_range: List[float], y_range: List[float]) -> None:
-        if not mark.label_text:
+    def ensure_mark_label_base(self, x_range: List[float], y_range: List[float]) -> None:
+        if self.mark_label_base_initialized:
             return
+        self.mark_label_base_x_span = max(abs(x_range[1] - x_range[0]), 1e-9)
+        self.mark_label_base_y_span = max(abs(y_range[1] - y_range[0]), 1e-9)
+        self.mark_label_base_initialized = True
+
+    def create_mark_label_font(self, x_range: List[float], y_range: List[float]) -> QFont:
+        self.ensure_mark_label_base(x_range, y_range)
         current_x_span = max(abs(x_range[1] - x_range[0]), 1e-9)
         current_y_span = max(abs(y_range[1] - y_range[0]), 1e-9)
-        x_scale = mark.label_base_x_span / current_x_span
-        y_scale = mark.label_base_y_span / current_y_span
+        x_scale = self.mark_label_base_x_span / current_x_span
+        y_scale = self.mark_label_base_y_span / current_y_span
         scale = math.sqrt(max(x_scale * y_scale, 1e-9))
-        font_size = max(4.0, min(14.0, 5.0 * scale))
-        font = QFont("Microsoft YaHei", int(round(font_size)))
-        mark.label_text.setFont(font)
+        font_size = max(5.0, min(16.0, 6.0 * scale))
+        return QFont("Microsoft YaHei", int(round(font_size)))
 
     def locate_mark(self) -> None:
         target = self.mark_id.text().strip()
@@ -1185,6 +1331,8 @@ class IntegratedTester(QWidget):
         self.parser = FrameParser()
         self.marks.clear()
         self.current_mark = None
+        self.mark_label_base_initialized = False
+        self.cursor_x = None
         self.plot.clear()
         self.legend = self.plot.getPlotItem().legend or self.plot.addLegend()
         self.legend.clear()
