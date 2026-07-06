@@ -73,10 +73,6 @@ class MainWindow(QMainWindow):
         export_action.triggered.connect(self.tester_export_excel)
         file_menu.addAction(export_action)
 
-        data_action = QAction("数据筛选", self)
-        data_action.triggered.connect(lambda: self.tabs.setCurrentWidget(self.select_page))
-        file_menu.addAction(data_action)
-
         setting_menu = self.menuBar().addMenu("设置")
         open_setting_action = QAction("打开筛选配置", self)
         open_setting_action.triggered.connect(self.open_filter_setting)
