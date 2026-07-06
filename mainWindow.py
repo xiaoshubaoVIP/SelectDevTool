@@ -24,7 +24,7 @@ class MainWindow(QMainWindow):
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
 
-        self._setup_logging()
+        # self._setup_logging()
         self._setup_menu()
 
         self.tabs = QTabWidget()
