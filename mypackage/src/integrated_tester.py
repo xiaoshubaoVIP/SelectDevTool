@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 
 import serial
 import serial.tools.list_ports
-from PyQt5 import QtCore
+from PyQt5 import QtCore, QtGui
 from PyQt5.QtCore import QRectF, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor, QFont, QPainter, QPen, QTextCursor
 from PyQt5.QtWidgets import (
@@ -45,6 +45,8 @@ from PyQt5.QtWidgets import (
 )
 
 import pyqtgraph as pg
+from pyqtgraph.graphicsItems.LegendItem import ItemSample
+from pyqtgraph.graphicsItems.ScatterPlotItem import drawSymbol
 from openpyxl import Workbook
 
 from mypackage.src.tester_protocol import (
@@ -122,6 +124,27 @@ class AxisZoomViewBox(pg.ViewBox):
             ev.accept()
             return
         super().mouseDragEvent(ev, axis=axis)
+
+
+class OriginalColorLegendSample(ItemSample):
+    def paint(self, painter, *args) -> None:
+        item_opts = self.item.opts
+        if item_opts.get("antialias"):
+            painter.setRenderHint(painter.RenderHint.Antialiasing)
+
+        color = getattr(self.item, "legend_color", None)
+        if color is None:
+            pen = pg.mkPen(item_opts.get("pen"))
+            color = pen.color()
+
+        pen = pg.mkPen(color, width=1)
+        brush = pg.mkBrush(color)
+        painter.setPen(pen)
+        painter.drawLine(2, 11, 18, 11)
+        painter.save()
+        painter.translate(10, 11)
+        drawSymbol(painter, "o", 5, pen, brush)
+        painter.restore()
 
 
 class AlignedPlotWidget(pg.PlotWidget):
@@ -883,6 +906,7 @@ class IntegratedTester(QWidget):
             downsample=1,
             clipToView=False,
         )
+        curve.legend_color = QColor(color)
         curve.setDynamicRangeLimit(None)
         curve.setZValue(5)
         self.plot.addItem(curve)
@@ -1121,7 +1145,9 @@ class IntegratedTester(QWidget):
 
     def apply_legend_style(self) -> None:
         if self.legend:
+            self.legend.sampleType = OriginalColorLegendSample
             self.legend.setLabelTextSize("7pt")
+            self.legend.setLabelTextColor("#000000")
 
     def table_item_changed(self, item: QTableWidgetItem) -> None:
         if item.column() != 0:
