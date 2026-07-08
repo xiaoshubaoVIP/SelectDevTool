@@ -678,18 +678,22 @@ class IntegratedTester(QWidget):
             return
         self.update_selection_region(left, right, start_y, cursor_y)
         if finished:
-            self.update_selection_stats(left, right, cursor_y)
+            self.update_selection_stats(left, right, start_y, cursor_y)
             self.set_selection_region_visible(False)
 
-    def update_selection_region(self, left: float, right: float, start_y: float, end_y: float) -> None:
-        if not hasattr(self, "selection_region"):
-            return
+    def selection_y_bounds(self, start_y: float, end_y: float):
         bottom, top = sorted((start_y, end_y))
         if abs(top - bottom) <= 1e-9:
             _, y_range = self.plot.getViewBox().viewRange()
             min_height = max(abs(y_range[1] - y_range[0]) * 0.06, 1)
             bottom = end_y - min_height / 2
             top = end_y + min_height / 2
+        return bottom, top
+
+    def update_selection_region(self, left: float, right: float, start_y: float, end_y: float) -> None:
+        if not hasattr(self, "selection_region"):
+            return
+        bottom, top = self.selection_y_bounds(start_y, end_y)
         self.selection_region.setRect(QRectF(left, bottom, right - left, top - bottom))
         edge_data = [
             ([left, right], [top, top]),
@@ -707,12 +711,18 @@ class IntegratedTester(QWidget):
         for edge in getattr(self, "selection_region_edges", []):
             edge.setVisible(visible)
 
-    def update_selection_stats(self, left: float, right: float, cursor_y: float) -> None:
+    def update_selection_stats(self, left: float, right: float, start_y: float, cursor_y: float) -> None:
         if self.start_timestamp is None:
             return
 
+        bottom, top = self.selection_y_bounds(start_y, cursor_y)
+        center_x = (left + right) / 2
+        center_y = (bottom + top) / 2
+        x_span = max(abs(right - left), 1e-9)
+        y_span = max(abs(top - bottom), 1e-9)
         best_item = None
         best_points = []
+        best_count = 0
         best_distance = None
         for item in self.series.values():
             if not self.is_series_selectable(item):
@@ -720,12 +730,18 @@ class IntegratedTester(QWidget):
             points = [
                 (ts - self.start_timestamp, value)
                 for ts, value in zip(item.timestamps, item.values)
-                if left <= ts - self.start_timestamp <= right
+                if left <= ts - self.start_timestamp <= right and bottom <= value <= top
             ]
             if not points:
                 continue
-            distance = min(abs(value - cursor_y) for _, value in points)
-            if best_distance is None or distance < best_distance:
+
+            count = len(points)
+            distance = min(
+                math.hypot((x_value - center_x) / x_span, (value - center_y) / y_span)
+                for x_value, value in points
+            )
+            if count > best_count or (count == best_count and (best_distance is None or distance < best_distance)):
+                best_count = count
                 best_distance = distance
                 best_item = item
                 best_points = points
