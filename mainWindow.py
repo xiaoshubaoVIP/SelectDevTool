@@ -12,14 +12,14 @@ from mypackage.src.SelectDevice import SelectDevice
 from mypackage.src.integrated_tester import IntegratedTester
 
 
-APP_VERSION = "V1.25"
+APP_VERSION = "V1.2.5"
 
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.root = self._prepare_runtime_root()
-        self.setWindowTitle(f"DeviceSelect - {APP_VERSION}")
+        self.setWindowTitle(f"Tester - {APP_VERSION}")
         icon_path = self.root / "icon" / "icon.png"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
