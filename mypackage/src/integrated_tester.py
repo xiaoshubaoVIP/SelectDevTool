@@ -1079,7 +1079,7 @@ class IntegratedTester(QWidget):
             self.table.item(row, col).setText(value)
         self.table.blockSignals(False)
 
-    def update_curve(self, item: SeriesData, rescale: bool = True) -> None:
+    def update_curve(self, item: SeriesData, rescale: bool = False) -> None:
         if not item.curve or self.start_timestamp is None:
             return
         x_values = [ts - self.start_timestamp for ts in item.timestamps]
@@ -1144,7 +1144,6 @@ class IntegratedTester(QWidget):
             if item.curve:
                 item.curve.setVisible(item.visible)
         self.refresh_plot_legend()
-        self.rescale_y_axis_to_visible_data()
 
     def refresh_plot_legend(self) -> None:
         legend = self.plot.getPlotItem().legend
