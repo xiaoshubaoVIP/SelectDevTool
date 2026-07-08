@@ -396,6 +396,8 @@ class IntegratedTester(QWidget):
         self.series: Dict[str, SeriesData] = {}
         self.marks: List[MarkData] = []
         self.current_mark: Optional[MarkData] = None
+        self.alarm_lines: List[pg.InfiniteLine] = []
+        self.last_smoke_state: Optional[int] = None
         self._rescaling_y_axis = False
         self.mark_label_font = QFont("Microsoft YaHei", 7)
         self.cursor_x: Optional[float] = None
@@ -957,10 +959,12 @@ class IntegratedTester(QWidget):
             return
         cmd = payload[0]
         data = payload[1:] if len(payload) > 1 else b""
-        if update_ui:
-            self.update_device_info(cmd, data)
         if self.start_timestamp is None:
             self.start_timestamp = timestamp
+        if cmd == 0x02 and data:
+            self.update_alarm_trigger(timestamp, data[0])
+        if update_ui:
+            self.update_device_info(cmd, data)
         if cmd != 0x02:
             return
 
@@ -1033,6 +1037,21 @@ class IntegratedTester(QWidget):
                 self.smoke_state_label.setText(self.lookup_text(self.smoke_status_text, data[0]))
             if len(data) >= 2:
                 self.smoke_type_label.setText(self.lookup_text(self.smoke_type_text, data[1]))
+
+    def update_alarm_trigger(self, timestamp: int, smoke_state: int) -> None:
+        if self.last_smoke_state is not None and self.last_smoke_state != 0x07 and smoke_state == 0x07:
+            self.add_alarm_line(timestamp)
+        self.last_smoke_state = smoke_state
+
+    def add_alarm_line(self, timestamp: int) -> None:
+        if self.start_timestamp is None:
+            self.start_timestamp = timestamp
+        x_pos = timestamp - self.start_timestamp
+        line = pg.InfiniteLine(pos=x_pos, angle=90, movable=False)
+        line.setPen(pg.mkPen("#ff0000", width=1, style=Qt.DashLine))
+        line.setZValue(18)
+        self.plot.addItem(line, ignoreBounds=True)
+        self.alarm_lines.append(line)
 
     @staticmethod
     def lookup_text(items: List[str], index: int) -> str:
@@ -1512,13 +1531,10 @@ class IntegratedTester(QWidget):
         stamp = mark.start if is_start else mark.end
         if stamp is None:
             return
-        line = pg.InfiniteLine(pos=stamp - self.start_timestamp, angle=90, movable=False)
-        line.setPen(pg.mkPen("#1f77b4" if is_start else "#d62728", width=1, style=Qt.DashLine))
-        self.plot.addItem(line)
         if is_start:
-            mark.start_line = line
+            mark.start_line = None
         else:
-            mark.end_line = line
+            mark.end_line = None
             start_pos = mark.start - self.start_timestamp
             end_pos = mark.end - self.start_timestamp if mark.end is not None else start_pos
             region = pg.LinearRegionItem(
@@ -1618,6 +1634,8 @@ class IntegratedTester(QWidget):
         self.parser = FrameParser()
         self.marks.clear()
         self.current_mark = None
+        self.alarm_lines.clear()
+        self.last_smoke_state = None
         self.cursor_x = None
         self.plot.clear()
         self.legend = self.plot.getPlotItem().legend or self.plot.addLegend()
