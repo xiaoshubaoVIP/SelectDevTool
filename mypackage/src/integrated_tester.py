@@ -1686,10 +1686,24 @@ class IntegratedTester(QWidget):
     def toggle_mark(self) -> None:
         now = int(time.time())
         if self.current_mark:
-            value, ok = QInputDialog.getDouble(self, "灵敏度输入", "请输入灵敏度:", 0.0, 0.0, 100.0, 3)
+            dialog = QInputDialog(self)
+            dialog.setWindowTitle("灵敏度输入")
+            dialog.setLabelText("请输入灵敏度:")
+            dialog.setInputMode(QInputDialog.DoubleInput)
+            dialog.setDoubleRange(0.0, 100.0)
+            dialog.setDoubleDecimals(3)
+            dialog.setDoubleValue(0.0)
+            dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowContextHelpButtonHint & ~Qt.WindowCloseButtonHint)
+            if dialog.exec_() != QDialog.Accepted:
+                return
+
+            value = dialog.doubleValue()
+            if value <= 0:
+                QMessageBox.warning(self, "参数错误", "请输入有效的灵敏度值")
+                return
+
             self.current_mark.end = now
-            if ok:
-                self.current_mark.sensitivity = value
+            self.current_mark.sensitivity = value
             self.current_mark.angle = self.angle_box.currentText()
             self.add_mark_line(self.current_mark, is_start=False)
             self.append_protocol_log(self.format_mark_value_log(self.current_mark))
