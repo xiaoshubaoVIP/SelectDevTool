@@ -493,8 +493,8 @@ class IntegratedTester(QWidget):
             self.mark_note,
             QLabel("角度"),
             self.angle_box,
-            self.mark_button,
             self.locate_button,
+            self.mark_button,
         ]:
             mark_layout.addWidget(widget)
         mark_layout.addStretch(1)
@@ -568,6 +568,8 @@ class IntegratedTester(QWidget):
         left_layout.addLayout(info_layout)
         left_layout.addLayout(mark_layout)
         left_layout.addWidget(self.left_content_splitter, 1)
+        left_panel_width = mark_layout.sizeHint().width() + 8
+        left.setMaximumWidth(left_panel_width)
 
         self.plot_view = AxisZoomViewBox()
         self.plot_view.selectionChanged.connect(self.handle_plot_selection)
@@ -595,7 +597,9 @@ class IntegratedTester(QWidget):
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(left)
         splitter.addWidget(self.plot)
-        splitter.setSizes([520, 1100])
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([left_panel_width, 1100])
 
         main_layout.addWidget(splitter)
 
