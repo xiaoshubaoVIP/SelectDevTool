@@ -17,6 +17,7 @@ from PyQt5.QtGui import QBrush, QColor, QFont, QPainter, QPen, QTextCursor
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QAction,
+    QButtonGroup,
     QComboBox,
     QColorDialog,
     QDialog,
@@ -35,7 +36,9 @@ from PyQt5.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QRadioButton,
     QSplitter,
+    QStackedWidget,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -65,6 +68,9 @@ class GraphConfig:
     length: int
     signed: bool
     color: str
+    source: str = "protocol"
+    start_text: str = ""
+    end_text: str = ""
 
 
 @dataclass
@@ -74,9 +80,10 @@ class SeriesData:
     current: int = 0
     maximum: Optional[int] = None
     minimum: Optional[int] = None
-    timestamps: List[int] = field(default_factory=list)
+    timestamps: List[float] = field(default_factory=list)
     values: List[int] = field(default_factory=list)
     curve: Optional[pg.PlotDataItem] = None
+    text_buffer: str = ""
 
 
 @dataclass
@@ -282,15 +289,29 @@ class AlignedPlotWidget(pg.PlotWidget):
 class GraphConfigDialog(QDialog):
     def __init__(self, parent=None, config: Optional[GraphConfig] = None) -> None:
         super().__init__(parent)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint & ~Qt.WindowCloseButtonHint)
         self.setWindowTitle("编辑曲线" if config else "添加曲线")
         self.color = config.color if config else "#000000"
+        self.source = config.source if config else "protocol"
+
+        self.protocol_radio = QRadioButton("协议解析")
+        self.text_radio = QRadioButton("文本截取")
+        self.source_group = QButtonGroup(self)
+        self.source_group.addButton(self.protocol_radio)
+        self.source_group.addButton(self.text_radio)
+        self.protocol_radio.setChecked(self.source != "text")
+        self.text_radio.setChecked(self.source == "text")
 
         self.name_edit = QLineEdit(config.name if config else "")
-        self.offset_edit = QLineEdit(str(config.offset) if config else "0")
+        self.offset_edit = QLineEdit(config.start_text if self.source == "text" and config else str(config.offset) if config else "0")
         self.length_box = QComboBox()
         self.length_box.addItems(["1", "2", "4"])
         if config:
             self.length_box.setCurrentText(str(config.length))
+        self.end_text_edit = QLineEdit(config.end_text if self.source == "text" and config else "")
+        self.length_stack = QStackedWidget()
+        self.length_stack.addWidget(self.length_box)
+        self.length_stack.addWidget(self.end_text_edit)
 
         self.type_box = QComboBox()
         self.type_box.addItems(["signed", "unsigned"])
@@ -306,12 +327,30 @@ class GraphConfigDialog(QDialog):
         buttons.rejected.connect(self.reject)
 
         layout = QFormLayout(self)
+        source_layout = QHBoxLayout()
+        source_layout.addWidget(self.protocol_radio)
+        source_layout.addWidget(self.text_radio)
+        source_layout.addStretch()
+        layout.addRow(source_layout)
         layout.addRow("名称", self.name_edit)
-        layout.addRow("偏移", self.offset_edit)
-        layout.addRow("数据长度", self.length_box)
+        self.offset_label = QLabel("偏移")
+        self.length_label = QLabel("数据长度")
+        layout.addRow(self.offset_label, self.offset_edit)
+        layout.addRow(self.length_label, self.length_stack)
         layout.addRow("整形类型", self.type_box)
         layout.addRow("颜色", self.color_button)
         layout.addRow(buttons)
+
+        self.protocol_radio.toggled.connect(self.update_source_mode)
+        self.text_radio.toggled.connect(self.update_source_mode)
+        self.update_source_mode()
+
+    def update_source_mode(self) -> None:
+        text_mode = self.text_radio.isChecked()
+        self.source = "text" if text_mode else "protocol"
+        self.offset_label.setText("开始字串" if text_mode else "偏移")
+        self.length_label.setText("结束字串" if text_mode else "数据长度")
+        self.length_stack.setCurrentWidget(self.end_text_edit if text_mode else self.length_box)
 
     def pick_color(self) -> None:
         color = QColorDialog.getColor(QColor(self.color), self)
@@ -321,12 +360,26 @@ class GraphConfigDialog(QDialog):
             self.color_button.setStyleSheet(f"background-color: {self.color};")
 
     def get_config(self) -> GraphConfig:
+        source = "text" if self.text_radio.isChecked() else "protocol"
+        if source == "protocol":
+            offset = int(self.offset_edit.text().strip())
+            length = int(self.length_box.currentText())
+            start_text = ""
+            end_text = ""
+        else:
+            offset = 0
+            length = 1
+            start_text = self.offset_edit.text().strip()
+            end_text = self.end_text_edit.text().strip()
         return GraphConfig(
             name=self.name_edit.text().strip(),
-            offset=int(self.offset_edit.text().strip()),
-            length=int(self.length_box.currentText()),
+            offset=offset,
+            length=length,
             signed=self.type_box.currentText() == "signed",
             color=self.color,
+            source=source,
+            start_text=start_text,
+            end_text=end_text,
         )
 
     def accept(self) -> None:
@@ -337,6 +390,9 @@ class GraphConfigDialog(QDialog):
             return
         if not cfg.name:
             QMessageBox.warning(self, "参数错误", "名称不能为空")
+            return
+        if cfg.source == "text" and (not cfg.start_text or not cfg.end_text):
+            QMessageBox.warning(self, "参数错误", "开始字串和结束字串不能为空")
             return
         super().accept()
 
@@ -392,13 +448,15 @@ class IntegratedTester(QWidget):
         self.serial_thread: Optional[SerialReader] = None
         self.protocol_log_handle = None
         self.protocol_log_path: Optional[Path] = None
-        self.start_timestamp: Optional[int] = None
+        self.start_timestamp: Optional[float] = None
         self.series: Dict[str, SeriesData] = {}
         self.marks: List[MarkData] = []
         self.current_mark: Optional[MarkData] = None
         self.alarm_lines: List[pg.InfiniteLine] = []
         self.last_smoke_state: Optional[int] = None
         self._rescaling_y_axis = False
+        self.text_extract_buffer_limit = 65536
+        self._last_text_extract_timestamp = 0.0
         self.mark_label_font = QFont("Microsoft YaHei", 7)
         self.cursor_x: Optional[float] = None
         self.smoke_status_text = ["正常", "校准", "通道1故障", "通道2故障", "水蒸气故障", "EMC故障", "预报", "报警", "静音"]
@@ -886,15 +944,20 @@ class IntegratedTester(QWidget):
         config.read(config_path, encoding="utf-8")
         for section in config.sections():
             try:
+                source_name = config.get(section, "数据获取方式", fallback="协议解析").strip()
+                source = "text" if source_name in ("文本截取", "text") else "protocol"
                 offset_text = config.get(section, "偏移", fallback="").strip()
-                if not offset_text:
+                if source == "protocol" and not offset_text:
                     continue
                 graph_config = GraphConfig(
                     name=section,
-                    offset=int(offset_text),
-                    length=int(config.get(section, "数据长度", fallback="1")),
+                    offset=int(offset_text) if offset_text else 0,
+                    length=int(config.get(section, "数据长度", fallback="1") or "1"),
                     signed=config.get(section, "整形类型", fallback="signed") == "signed",
                     color=config.get(section, "颜色", fallback="#000000") or "#000000",
+                    source=source,
+                    start_text=config.get(section, "开始字串", fallback=""),
+                    end_text=config.get(section, "结束字串", fallback=""),
                 )
             except ValueError:
                 continue
@@ -972,10 +1035,97 @@ class IntegratedTester(QWidget):
         self.open_button.setText("关闭串口" if opened else "打开串口")
 
     def on_serial_data(self, data: bytes) -> None:
-        self.append_serial_text(data)
-        for frame in self.parser.feed(data):
+        received_time = time.time()
+        serial_text = self.decode_serial_text(data)
+        self.append_serial_text(serial_text)
+        self.consume_text_data(serial_text, received_time)
+        for frame in self.parser.feed(data, int(received_time)):
             self.append_protocol_log(f"Receive: {bytes_to_hex(frame.raw)}")
             self.consume_frame(frame.timestamp, frame.payload)
+
+    def consume_text_data(self, text: str, timestamp: float, update_ui: bool = True) -> None:
+        if not text:
+            return
+        for row, item in enumerate(self.series.values()):
+            cfg = item.config
+            if cfg.source != "text":
+                continue
+            for value in self.extract_text_values(item, text):
+                point_timestamp = self.next_text_extract_timestamp(timestamp)
+                if self.start_timestamp is None:
+                    self.start_timestamp = point_timestamp
+                self.append_series_value(item, point_timestamp, value)
+                if update_ui:
+                    self.update_table_row(row, item)
+                    self.update_curve(item, rescale=False)
+
+    def extract_text_values(self, item: SeriesData, text: str) -> List[int]:
+        cfg = item.config
+        if not cfg.start_text or not cfg.end_text:
+            return []
+
+        item.text_buffer += text
+        values: List[int] = []
+        while item.text_buffer:
+            start_index = item.text_buffer.find(cfg.start_text)
+            if start_index < 0:
+                self.keep_text_buffer_tail(item, cfg)
+                break
+
+            value_start = start_index + len(cfg.start_text)
+            end_index = item.text_buffer.find(cfg.end_text, value_start)
+            if end_index < 0:
+                if start_index > 0:
+                    item.text_buffer = item.text_buffer[start_index:]
+                if len(item.text_buffer) > self.text_extract_buffer_limit:
+                    item.text_buffer = item.text_buffer[-self.text_extract_buffer_limit:]
+                break
+
+            raw_value = item.text_buffer[value_start:end_index]
+            value = self.parse_text_value(raw_value, cfg.signed)
+            if value is not None:
+                values.append(value)
+            item.text_buffer = item.text_buffer[end_index + len(cfg.end_text):]
+
+        if len(item.text_buffer) > self.text_extract_buffer_limit:
+            item.text_buffer = item.text_buffer[-self.text_extract_buffer_limit:]
+        return values
+
+    def keep_text_buffer_tail(self, item: SeriesData, cfg: GraphConfig) -> None:
+        tail_length = max(len(cfg.start_text), len(cfg.end_text), 1) - 1
+        if tail_length > 0:
+            item.text_buffer = item.text_buffer[-tail_length:]
+        else:
+            item.text_buffer = ""
+
+    @staticmethod
+    def parse_text_value(text: str, signed: bool) -> Optional[int]:
+        match = re.search(r"[-+]?(?:0[xX][0-9a-fA-F]+|\d+)", text.strip())
+        if not match:
+            return None
+
+        token = match.group(0)
+        unsigned_token = token.lstrip("+-")
+        if unsigned_token.lower().startswith("0x"):
+            digit_count = len(unsigned_token) - 2
+        else:
+            digit_count = len(unsigned_token)
+        if digit_count <= 0 or digit_count > 18:
+            return None
+
+        try:
+            value = int(token, 0)
+        except ValueError:
+            return None
+        if not signed and value < 0:
+            return None
+        return value
+
+    def next_text_extract_timestamp(self, timestamp: float) -> float:
+        if timestamp <= self._last_text_extract_timestamp:
+            timestamp = self._last_text_extract_timestamp + 0.001
+        self._last_text_extract_timestamp = timestamp
+        return timestamp
 
     def consume_frame(self, timestamp: int, payload: bytes, update_ui: bool = True) -> None:
         if not payload:
@@ -994,6 +1144,8 @@ class IntegratedTester(QWidget):
         updated = False
         for row, item in enumerate(self.series.values()):
             cfg = item.config
+            if cfg.source != "protocol":
+                continue
             end = cfg.offset + cfg.length
             if end > len(data):
                 continue
@@ -1280,8 +1432,17 @@ class IntegratedTester(QWidget):
             config.remove_section(graph_config.name)
 
         config.add_section(graph_config.name)
-        config.set(graph_config.name, "偏移", str(graph_config.offset))
-        config.set(graph_config.name, "数据长度", str(graph_config.length))
+        config.set(graph_config.name, "数据获取方式", "文本截取" if graph_config.source == "text" else "协议解析")
+        if graph_config.source == "text":
+            config.set(graph_config.name, "偏移", "")
+            config.set(graph_config.name, "数据长度", "")
+            config.set(graph_config.name, "开始字串", graph_config.start_text)
+            config.set(graph_config.name, "结束字串", graph_config.end_text)
+        else:
+            config.set(graph_config.name, "偏移", str(graph_config.offset))
+            config.set(graph_config.name, "数据长度", str(graph_config.length))
+            config.remove_option(graph_config.name, "开始字串")
+            config.remove_option(graph_config.name, "结束字串")
         config.set(graph_config.name, "整形类型", "signed" if graph_config.signed else "unsigned")
         config.set(graph_config.name, "颜色", graph_config.color)
 
@@ -1669,8 +1830,10 @@ class IntegratedTester(QWidget):
             item.minimum = None
             item.timestamps.clear()
             item.values.clear()
+            item.text_buffer = ""
             item.curve = self.create_series_curve(item.config)
             self.update_table_row(row, item)
+        self._last_text_extract_timestamp = 0.0
         self.refresh_series_visibility()
         self.setup_selection_items()
         self.protocol_browser.clear()
@@ -1742,7 +1905,8 @@ class IntegratedTester(QWidget):
     def close_all_logs(self) -> None:
         self.close_protocol_log_file()
 
-    def append_serial_text(self, data: bytes) -> None:
+    @staticmethod
+    def decode_serial_text(data: bytes) -> str:
         text = data.decode("utf-8", errors="replace")
         text = "".join(ch if ch in "\r\n\t" or ord(ch) >= 32 else " " for ch in text)
         text = text.replace("\r\n", "\n").replace("\r", "\n")
@@ -1750,7 +1914,9 @@ class IntegratedTester(QWidget):
             text = text.replace("\n\n", "\n")
         if not text:
             text = bytes_to_hex(data)
+        return text
 
+    def append_serial_text(self, text: str) -> None:
         cursor = self.serial_browser.textCursor()
         cursor.movePosition(QTextCursor.End)
         cursor.insertText(text)
