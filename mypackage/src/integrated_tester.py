@@ -318,7 +318,7 @@ class GraphConfigDialog(QDialog):
         if config:
             self.type_box.setCurrentText("signed" if config.signed else "unsigned")
 
-        self.color_button = QPushButton(self.color)
+        self.color_button = QPushButton("")
         self.color_button.setStyleSheet(f"background-color: {self.color};")
         self.color_button.clicked.connect(self.pick_color)
 
@@ -356,7 +356,7 @@ class GraphConfigDialog(QDialog):
         color = QColorDialog.getColor(QColor(self.color), self)
         if color.isValid():
             self.color = color.name()
-            self.color_button.setText(self.color)
+            self.color_button.setText("")
             self.color_button.setStyleSheet(f"background-color: {self.color};")
 
     def get_config(self) -> GraphConfig:
@@ -1001,12 +1001,29 @@ class IntegratedTester(QWidget):
         return curve
 
     def refresh_ports(self) -> None:
-        current = self.port_box.currentText()
+        current = self.selected_port_name()
         self.port_box.clear()
-        ports = [port.device for port in serial.tools.list_ports.comports()]
-        self.port_box.addItems(ports)
-        if current in ports:
-            self.port_box.setCurrentText(current)
+        for port in serial.tools.list_ports.comports():
+            self.port_box.addItem(self.format_port_display(port), port.device)
+        if current:
+            index = self.port_box.findData(current)
+            if index >= 0:
+                self.port_box.setCurrentIndex(index)
+
+    @staticmethod
+    def format_port_display(port) -> str:
+        device = port.device
+        description = (port.description or "").strip()
+        description = re.sub(rf"\s*\({re.escape(device)}\)\s*$", "", description).strip()
+        if description and description != device:
+            return f"{device} - {description}"
+        return device
+
+    def selected_port_name(self) -> str:
+        data = self.port_box.currentData()
+        if data:
+            return str(data)
+        return self.port_box.currentText().split(" - ", 1)[0].strip()
 
     def toggle_serial(self) -> None:
         if self.serial_thread and self.serial_thread.running:
@@ -1014,12 +1031,13 @@ class IntegratedTester(QWidget):
             self.open_button.setText("打开串口")
             return
 
-        if not self.port_box.currentText():
+        port_name = self.selected_port_name()
+        if not port_name:
             QMessageBox.warning(self, "串口", "未找到可用串口")
             return
 
         params = {
-            "port": self.port_box.currentText(),
+            "port": port_name,
             "baudrate": int(self.baud_box.currentText()),
             "bytesize": serial.EIGHTBITS,
             "parity": serial.PARITY_NONE,
