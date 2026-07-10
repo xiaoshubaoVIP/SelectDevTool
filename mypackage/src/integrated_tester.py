@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (
     QAbstractItemView,
     QAction,
     QButtonGroup,
+    QCheckBox,
     QComboBox,
     QColorDialog,
     QDialog,
@@ -428,8 +429,11 @@ class SerialReader(QThread):
         self.wait(1500)
 
     def send(self, text: str) -> None:
+        self.send_bytes(text.encode("utf-8"))
+
+    def send_bytes(self, data: bytes) -> None:
         if self.serial_port and self.serial_port.is_open:
-            self.serial_port.write(text.encode("utf-8"))
+            self.serial_port.write(data)
 
 
 class IntegratedTester(QWidget):
@@ -597,13 +601,19 @@ class IntegratedTester(QWidget):
         self.serial_browser = QTextBrowser()
         self.serial_browser.document().setMaximumBlockCount(1500)
         self.text_tabs = QTabWidget()
-        self.text_tabs.addTab(self.protocol_browser, "协议")
         self.text_tabs.addTab(self.serial_browser, "串口")
+        self.text_tabs.addTab(self.protocol_browser, "协议")
+        self.text_tabs.setCurrentWidget(self.serial_browser)
         self.send_edit = QLineEdit()
+        self.hex_send_check = QCheckBox("Hex发送")
+        self.line_end_check = QCheckBox("回车换行")
+        self.line_end_check.setChecked(True)
         self.send_button = QPushButton("发送")
         self.send_button.clicked.connect(self.send_serial_data)
         send_layout = QHBoxLayout()
         send_layout.addWidget(self.send_edit)
+        send_layout.addWidget(self.hex_send_check)
+        send_layout.addWidget(self.line_end_check)
         send_layout.addWidget(self.send_button)
 
         text_panel = QWidget()
@@ -1877,8 +1887,35 @@ class IntegratedTester(QWidget):
         self.smoke_type_label.setText("无")
 
     def send_serial_data(self) -> None:
-        if self.serial_thread:
-            self.serial_thread.send(self.send_edit.text())
+        if not self.serial_thread:
+            return
+
+        text = self.send_edit.text()
+        if self.hex_send_check.isChecked():
+            data = self.parse_hex_send_text(text)
+            if data is None:
+                QMessageBox.warning(self, "发送失败", "请输入有效的16进制数据")
+                return
+            if self.line_end_check.isChecked():
+                data += b"\r\n"
+            self.serial_thread.send_bytes(data)
+        else:
+            if self.line_end_check.isChecked():
+                text += "\r\n"
+            self.serial_thread.send(text)
+
+    @staticmethod
+    def parse_hex_send_text(text: str) -> Optional[bytes]:
+        compact = re.sub(r"(?i)0x", "", text.strip())
+        compact = re.sub(r"[\s,;:_-]+", "", compact)
+        if not compact:
+            return b""
+        if len(compact) % 2 != 0 or re.search(r"[^0-9a-fA-F]", compact):
+            return None
+        try:
+            return bytes.fromhex(compact)
+        except ValueError:
+            return None
 
     def open_protocol_log_file(self) -> None:
         self.log_dir.mkdir(exist_ok=True)
