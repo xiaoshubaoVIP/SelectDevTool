@@ -72,6 +72,8 @@ class GraphConfig:
     source: str = "protocol"
     start_text: str = ""
     end_text: str = ""
+    text_value_type: str = "signed"
+    scale: int = 1
 
 
 @dataclass
@@ -294,6 +296,7 @@ class GraphConfigDialog(QDialog):
         self.setWindowTitle("编辑曲线" if config else "添加曲线")
         self.color = config.color if config else "#000000"
         self.source = config.source if config else "protocol"
+        self.configured_type = config.text_value_type if config else "signed"
 
         self.protocol_radio = QRadioButton("协议解析")
         self.text_radio = QRadioButton("文本截取")
@@ -315,9 +318,7 @@ class GraphConfigDialog(QDialog):
         self.length_stack.addWidget(self.end_text_edit)
 
         self.type_box = QComboBox()
-        self.type_box.addItems(["signed", "unsigned"])
-        if config:
-            self.type_box.setCurrentText("signed" if config.signed else "unsigned")
+        self.scale_edit = QLineEdit(str(config.scale if config else 1))
 
         self.color_button = QPushButton("")
         self.color_button.setStyleSheet(f"background-color: {self.color};")
@@ -338,7 +339,10 @@ class GraphConfigDialog(QDialog):
         self.length_label = QLabel("数据长度")
         layout.addRow(self.offset_label, self.offset_edit)
         layout.addRow(self.length_label, self.length_stack)
-        layout.addRow("整形类型", self.type_box)
+        self.type_label = QLabel("整形类型")
+        self.scale_label = QLabel("倍率")
+        layout.addRow(self.type_label, self.type_box)
+        layout.addRow(self.scale_label, self.scale_edit)
         layout.addRow("颜色", self.color_button)
         layout.addRow(buttons)
 
@@ -352,6 +356,18 @@ class GraphConfigDialog(QDialog):
         self.offset_label.setText("开始字串" if text_mode else "偏移")
         self.length_label.setText("结束字串" if text_mode else "数据长度")
         self.length_stack.setCurrentWidget(self.end_text_edit if text_mode else self.length_box)
+        current_type = self.type_box.currentText() or self.configured_type
+        options = ["signed", "unsigned", "decimal"] if text_mode else ["signed", "unsigned"]
+        self.type_box.blockSignals(True)
+        self.type_box.clear()
+        self.type_box.addItems(options)
+        if current_type not in options:
+            current_type = "signed"
+        self.type_box.setCurrentText(current_type)
+        self.type_box.blockSignals(False)
+        self.type_label.setText("数值类型" if text_mode else "整形类型")
+        self.scale_label.setVisible(text_mode)
+        self.scale_edit.setVisible(text_mode)
 
     def pick_color(self) -> None:
         color = QColorDialog.getColor(QColor(self.color), self)
@@ -362,38 +378,50 @@ class GraphConfigDialog(QDialog):
 
     def get_config(self) -> GraphConfig:
         source = "text" if self.text_radio.isChecked() else "protocol"
+        value_type = self.type_box.currentText()
+        scale = 1
         if source == "protocol":
             offset = int(self.offset_edit.text().strip())
             length = int(self.length_box.currentText())
             start_text = ""
             end_text = ""
+            if value_type not in ("signed", "unsigned"):
+                value_type = "signed"
         else:
             offset = 0
             length = 1
             start_text = self.offset_edit.text().strip()
             end_text = self.end_text_edit.text().strip()
+            scale = int(self.scale_edit.text().strip() or "1")
+            if value_type not in ("signed", "unsigned", "decimal"):
+                value_type = "signed"
         return GraphConfig(
             name=self.name_edit.text().strip(),
             offset=offset,
             length=length,
-            signed=self.type_box.currentText() == "signed",
+            signed=value_type != "unsigned",
             color=self.color,
             source=source,
             start_text=start_text,
             end_text=end_text,
+            text_value_type=value_type,
+            scale=scale,
         )
 
     def accept(self) -> None:
         try:
             cfg = self.get_config()
         except ValueError:
-            QMessageBox.warning(self, "参数错误", "偏移必须是整数")
+            QMessageBox.warning(self, "参数错误", "偏移和倍率必须是整数")
             return
         if not cfg.name:
             QMessageBox.warning(self, "参数错误", "名称不能为空")
             return
         if cfg.source == "text" and (not cfg.start_text or not cfg.end_text):
             QMessageBox.warning(self, "参数错误", "开始字串和结束字串不能为空")
+            return
+        if cfg.source == "text" and cfg.scale <= 0:
+            QMessageBox.warning(self, "参数错误", "倍率必须是正整数")
             return
         super().accept()
 
@@ -959,15 +987,29 @@ class IntegratedTester(QWidget):
                 offset_text = config.get(section, "偏移", fallback="").strip()
                 if source == "protocol" and not offset_text:
                     continue
+                integer_type = config.get(section, "整形类型", fallback="signed").strip()
+                if integer_type not in ("signed", "unsigned"):
+                    integer_type = "signed"
+                text_value_type = config.get(section, "数值类型", fallback=integer_type).strip()
+                if text_value_type not in ("signed", "unsigned", "decimal"):
+                    text_value_type = integer_type
+                try:
+                    scale = int(config.get(section, "倍率", fallback="1").strip() or "1")
+                except ValueError:
+                    scale = 1
+                if scale <= 0:
+                    scale = 1
                 graph_config = GraphConfig(
                     name=section,
                     offset=int(offset_text) if offset_text else 0,
                     length=int(config.get(section, "数据长度", fallback="1") or "1"),
-                    signed=config.get(section, "整形类型", fallback="signed") == "signed",
+                    signed=integer_type == "signed" if source == "protocol" else text_value_type != "unsigned",
                     color=config.get(section, "颜色", fallback="#000000") or "#000000",
                     source=source,
                     start_text=config.get(section, "开始字串", fallback=""),
                     end_text=config.get(section, "结束字串", fallback=""),
+                    text_value_type=text_value_type if source == "text" else integer_type,
+                    scale=scale if source == "text" else 1,
                 )
             except ValueError:
                 continue
@@ -1110,7 +1152,7 @@ class IntegratedTester(QWidget):
                 break
 
             raw_value = item.text_buffer[value_start:end_index]
-            value = self.parse_text_value(raw_value, cfg.signed)
+            value = self.parse_text_value(raw_value, cfg)
             if value is not None:
                 values.append(value)
             item.text_buffer = item.text_buffer[end_index + len(cfg.end_text):]
@@ -1126,8 +1168,17 @@ class IntegratedTester(QWidget):
         else:
             item.text_buffer = ""
 
+    @classmethod
+    def parse_text_value(cls, text: str, cfg: GraphConfig) -> Optional[int]:
+        if cfg.text_value_type == "decimal":
+            return cls.parse_scaled_decimal_text(text, cfg.scale)
+        value = cls.parse_integer_text(text, cfg.signed)
+        if value is None:
+            return None
+        return value * max(cfg.scale, 1)
+
     @staticmethod
-    def parse_text_value(text: str, signed: bool) -> Optional[int]:
+    def parse_integer_text(text: str, signed: bool) -> Optional[int]:
         match = re.search(r"[-+]?(?:0[xX][0-9a-fA-F]+|\d+)", text.strip())
         if not match:
             return None
@@ -1148,6 +1199,43 @@ class IntegratedTester(QWidget):
         if not signed and value < 0:
             return None
         return value
+
+    @staticmethod
+    def parse_scaled_decimal_text(text: str, scale: int) -> Optional[int]:
+        scale = max(scale, 1)
+        match = re.search(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)", text.strip())
+        if not match:
+            return None
+
+        token = match.group(0)
+        sign = -1 if token.startswith("-") else 1
+        unsigned_token = token.lstrip("+-")
+        if "." in unsigned_token:
+            whole_text, frac_text = unsigned_token.split(".", 1)
+        else:
+            whole_text, frac_text = unsigned_token, ""
+
+        if not whole_text:
+            whole_text = "0"
+        if not whole_text.isdigit() or (frac_text and not frac_text.isdigit()):
+            return None
+
+        if len(whole_text) + len(frac_text) > 24:
+            return None
+        digit_count = len(whole_text.lstrip("0")) + len(frac_text.rstrip("0"))
+        if digit_count > 18:
+            return None
+
+        try:
+            whole_value = int(whole_text)
+            value = whole_value * scale
+            if frac_text:
+                denominator = 10 ** len(frac_text)
+                fraction_value = int(frac_text)
+                value += (fraction_value * scale + denominator // 2) // denominator
+        except ValueError:
+            return None
+        return sign * value
 
     def next_text_extract_timestamp(self, timestamp: float) -> float:
         if timestamp <= self._last_text_extract_timestamp:
@@ -1466,11 +1554,15 @@ class IntegratedTester(QWidget):
             config.set(graph_config.name, "数据长度", "")
             config.set(graph_config.name, "开始字串", graph_config.start_text)
             config.set(graph_config.name, "结束字串", graph_config.end_text)
+            config.set(graph_config.name, "数值类型", graph_config.text_value_type)
+            config.set(graph_config.name, "倍率", str(graph_config.scale))
         else:
             config.set(graph_config.name, "偏移", str(graph_config.offset))
             config.set(graph_config.name, "数据长度", str(graph_config.length))
             config.remove_option(graph_config.name, "开始字串")
             config.remove_option(graph_config.name, "结束字串")
+            config.remove_option(graph_config.name, "数值类型")
+            config.remove_option(graph_config.name, "倍率")
         config.set(graph_config.name, "整形类型", "signed" if graph_config.signed else "unsigned")
         config.set(graph_config.name, "颜色", graph_config.color)
 
