@@ -40,6 +40,9 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QSplitter,
     QStackedWidget,
+    QStyle,
+    QStyleOptionComboBox,
+    QStylePainter,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -87,6 +90,18 @@ class SeriesData:
     values: List[int] = field(default_factory=list)
     curve: Optional[pg.PlotDataItem] = None
     text_buffer: str = ""
+
+
+class PortComboBox(QComboBox):
+    def paintEvent(self, event) -> None:
+        painter = QStylePainter(self)
+        option = QStyleOptionComboBox()
+        self.initStyleOption(option)
+        port_name = self.currentData()
+        if port_name:
+            option.currentText = str(port_name)
+        painter.drawComplexControl(QStyle.CC_ComboBox, option)
+        painter.drawControl(QStyle.CE_ComboBoxLabel, option)
 
 
 @dataclass
@@ -543,7 +558,7 @@ class IntegratedTester(QWidget):
 
         self.open_button = QPushButton("打开串口")
         self.open_button.clicked.connect(self.toggle_serial)
-        self.port_box = QComboBox()
+        self.port_box = PortComboBox()
         self.baud_box = QComboBox()
         self.baud_box.addItems(["4800", "9600", "19200", "115200"])
         self.save_button = QPushButton("保存数据")
@@ -628,6 +643,8 @@ class IntegratedTester(QWidget):
         self.protocol_browser.document().setMaximumBlockCount(1500)
         self.serial_browser = QTextBrowser()
         self.serial_browser.document().setMaximumBlockCount(1500)
+        self.install_text_browser_context_menu(self.protocol_browser)
+        self.install_text_browser_context_menu(self.serial_browser)
         self.text_tabs = QTabWidget()
         self.text_tabs.addTab(self.serial_browser, "串口")
         self.text_tabs.addTab(self.protocol_browser, "协议")
@@ -1193,7 +1210,8 @@ class IntegratedTester(QWidget):
             return None
 
         try:
-            value = int(token, 0)
+            base = 16 if unsigned_token.lower().startswith("0x") else 10
+            value = int(token, base)
         except ValueError:
             return None
         if not signed and value < 0:
@@ -1465,6 +1483,22 @@ class IntegratedTester(QWidget):
         if series and series.curve:
             series.visible = item.checkState() == Qt.Checked
             self.refresh_series_visibility()
+
+    def install_text_browser_context_menu(self, browser: QTextBrowser) -> None:
+        browser.setContextMenuPolicy(Qt.CustomContextMenu)
+        browser.customContextMenuRequested.connect(
+            lambda pos, target=browser: self.show_text_browser_context_menu(target, pos)
+        )
+
+    def show_text_browser_context_menu(self, browser: QTextBrowser, pos) -> None:
+        menu = browser.createStandardContextMenu()
+        if not menu.isEmpty():
+            menu.addSeparator()
+        clear_action = QAction("Clear", self)
+        clear_action.setEnabled(bool(browser.toPlainText()))
+        clear_action.triggered.connect(browser.clear)
+        menu.addAction(clear_action)
+        menu.exec_(browser.mapToGlobal(pos))
 
     def show_table_context_menu(self, pos) -> None:
         menu = QMenu(self)
