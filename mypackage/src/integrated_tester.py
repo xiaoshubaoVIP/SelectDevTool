@@ -38,6 +38,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
+    QSizePolicy,
     QSplitter,
     QStackedWidget,
     QStyle,
@@ -331,6 +332,8 @@ class GraphConfigDialog(QDialog):
         self.length_stack = QStackedWidget()
         self.length_stack.addWidget(self.length_box)
         self.length_stack.addWidget(self.end_text_edit)
+        self.length_stack.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.length_stack.setFixedHeight(max(self.length_box.sizeHint().height(), self.end_text_edit.sizeHint().height()))
 
         self.type_box = QComboBox()
         self.scale_edit = QLineEdit(str(config.scale if config else 1))
@@ -1118,7 +1121,7 @@ class IntegratedTester(QWidget):
         self.serial_thread.start()
 
     def on_serial_state(self, opened: bool, message: str) -> None:
-        self.append_protocol_log(message)
+        self.append_serial_log(message)
         self.open_button.setText("关闭串口" if opened else "打开串口")
 
     def on_serial_data(self, data: bytes) -> None:
@@ -2069,6 +2072,11 @@ class IntegratedTester(QWidget):
         message = str(text).rstrip()
         self.protocol_browser.append(message)
         self.write_protocol_log(message)
+
+    def append_serial_log(self, text: str) -> None:
+        message = str(text).rstrip()
+        if message:
+            self.serial_browser.append(message)
 
     def write_protocol_log(self, message: str) -> None:
         if not self.protocol_log_handle:
