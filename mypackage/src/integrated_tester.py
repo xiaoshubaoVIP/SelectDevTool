@@ -987,6 +987,17 @@ class IntegratedTester(QWidget):
             return f"{mins}m{secs}s"
         return f"{secs}s"
 
+    @staticmethod
+    def config_visible_state(config: configparser.ConfigParser, section: str, default: bool = True) -> bool:
+        value = config.get(section, "显示", fallback="").strip().lower()
+        if not value:
+            return default
+        if value in ("1", "true", "yes", "on", "checked", "显示"):
+            return True
+        if value in ("0", "false", "no", "off", "unchecked", "隐藏", "不显示"):
+            return False
+        return default
+
     def load_graph_configs(self) -> None:
         previous_visible = {name: item.visible for name, item in self.series.items()}
         self.series.clear()
@@ -1019,6 +1030,7 @@ class IntegratedTester(QWidget):
                     scale = 1
                 if scale <= 0:
                     scale = 1
+                visible = self.config_visible_state(config, section, previous_visible.get(section, True))
                 graph_config = GraphConfig(
                     name=section,
                     offset=int(offset_text) if offset_text else 0,
@@ -1035,7 +1047,7 @@ class IntegratedTester(QWidget):
                 continue
 
             curve = self.create_series_curve(graph_config)
-            item = SeriesData(config=graph_config, curve=curve, visible=previous_visible.get(section, True))
+            item = SeriesData(config=graph_config, curve=curve, visible=visible)
             self.series[section] = item
 
             row = self.table.rowCount()
@@ -1486,6 +1498,17 @@ class IntegratedTester(QWidget):
         if series and series.curve:
             series.visible = item.checkState() == Qt.Checked
             self.refresh_series_visibility()
+            self.save_series_visible_state(item.text(), series.visible)
+
+    def save_series_visible_state(self, name: str, visible: bool) -> None:
+        config_path = self.setting_dir / "table.ini"
+        config = configparser.ConfigParser()
+        config.read(config_path, encoding="utf-8")
+        if not config.has_section(name):
+            return
+        config.set(name, "显示", "true" if visible else "false")
+        with open(config_path, "w", encoding="utf-8") as file:
+            config.write(file)
 
     def install_text_browser_context_menu(self, browser: QTextBrowser) -> None:
         browser.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -1579,12 +1602,21 @@ class IntegratedTester(QWidget):
         config = configparser.ConfigParser()
         config.read(config_path, encoding="utf-8")
 
+        visible_section = old_name or graph_config.name
+        if visible_section in self.series:
+            visible = self.series[visible_section].visible
+        elif config.has_section(visible_section):
+            visible = self.config_visible_state(config, visible_section, True)
+        else:
+            visible = True
+
         if old_name and old_name != graph_config.name:
             config.remove_section(old_name)
         if config.has_section(graph_config.name):
             config.remove_section(graph_config.name)
 
         config.add_section(graph_config.name)
+        config.set(graph_config.name, "显示", "true" if visible else "false")
         config.set(graph_config.name, "数据获取方式", "文本截取" if graph_config.source == "text" else "协议解析")
         if graph_config.source == "text":
             config.set(graph_config.name, "偏移", "")
