@@ -998,6 +998,54 @@ class IntegratedTester(QWidget):
             return False
         return default
 
+    def read_graph_config_section(
+        self,
+        config: configparser.ConfigParser,
+        section: str,
+        default_visible: bool = True,
+    ) -> Optional[tuple[GraphConfig, bool]]:
+        try:
+            source_name = config.get(section, "数据获取方式", fallback="协议解析").strip()
+            source = "text" if source_name in ("文本截取", "text") else "protocol"
+            offset_text = config.get(section, "偏移", fallback="").strip()
+            if source == "protocol" and not offset_text:
+                return None
+            integer_type = config.get(section, "整形类型", fallback="signed").strip()
+            if integer_type not in ("signed", "unsigned"):
+                integer_type = "signed"
+            text_value_type = config.get(section, "数值类型", fallback=integer_type).strip()
+            if text_value_type not in ("signed", "unsigned", "decimal"):
+                text_value_type = integer_type
+            try:
+                scale = int(config.get(section, "倍率", fallback="1").strip() or "1")
+            except ValueError:
+                scale = 1
+            if scale <= 0:
+                scale = 1
+            graph_config = GraphConfig(
+                name=section,
+                offset=int(offset_text) if offset_text else 0,
+                length=int(config.get(section, "数据长度", fallback="1") or "1"),
+                signed=integer_type == "signed" if source == "protocol" else text_value_type != "unsigned",
+                color=config.get(section, "颜色", fallback="#000000") or "#000000",
+                source=source,
+                start_text=config.get(section, "开始字串", fallback=""),
+                end_text=config.get(section, "结束字串", fallback=""),
+                text_value_type=text_value_type if source == "text" else integer_type,
+                scale=scale if source == "text" else 1,
+            )
+            return graph_config, self.config_visible_state(config, section, default_visible)
+        except ValueError:
+            return None
+
+    def read_saved_graph_config(self, name: str, default_visible: bool = True) -> Optional[tuple[GraphConfig, bool]]:
+        config_path = self.setting_dir / "table.ini"
+        config = configparser.ConfigParser()
+        config.read(config_path, encoding="utf-8")
+        if not config.has_section(name):
+            return None
+        return self.read_graph_config_section(config, name, default_visible)
+
     def load_graph_configs(self) -> None:
         previous_visible = {name: item.visible for name, item in self.series.items()}
         self.series.clear()
@@ -1083,6 +1131,103 @@ class IntegratedTester(QWidget):
         curve.setZValue(5)
         self.plot.addItem(curve)
         return curve
+
+    def table_row_for_name(self, name: str) -> int:
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item and item.text() == name:
+                return row
+        return -1
+
+    def upsert_series_table_row(self, row: int, name: str, item: SeriesData) -> int:
+        if row < 0:
+            row = self.table.rowCount()
+        if row >= self.table.rowCount():
+            self.table.insertRow(row)
+
+        name_item = self.table.item(row, 0)
+        if name_item is None:
+            name_item = QTableWidgetItem()
+            self.table.setItem(row, 0, name_item)
+        name_item.setText(name)
+        name_item.setCheckState(Qt.Checked if item.visible else Qt.Unchecked)
+
+        values = [
+            str(item.current),
+            str(item.maximum if item.maximum is not None else 0),
+            str(item.minimum if item.minimum is not None else 0),
+        ]
+        for col, value in enumerate(values, 1):
+            value_item = self.table.item(row, col)
+            if value_item is None:
+                value_item = QTableWidgetItem()
+                self.table.setItem(row, col, value_item)
+            value_item.setText(value)
+        return row
+
+    def clear_selection_summary(self) -> None:
+        if hasattr(self, "selection_highlight"):
+            self.selection_highlight.setData([], [])
+            self.selection_highlight.setVisible(False)
+        if hasattr(self, "selection_text"):
+            self.selection_text.setVisible(False)
+        self.set_selection_region_visible(False)
+
+    def remove_series_curve(self, item: Optional[SeriesData]) -> None:
+        if item and item.curve:
+            self.plot.removeItem(item.curve)
+            item.curve = None
+
+    def replace_series_in_order(self, old_name: Optional[str], new_name: str, item: SeriesData) -> None:
+        if old_name and old_name in self.series:
+            updated = {}
+            for name, existing in self.series.items():
+                if name == old_name:
+                    updated[new_name] = item
+                elif name != new_name:
+                    updated[name] = existing
+            self.series = updated
+        elif new_name in self.series:
+            self.series[new_name] = item
+        else:
+            self.series[new_name] = item
+
+    def reload_graph_config_view(self, name: str, old_name: Optional[str] = None, row: int = -1) -> None:
+        old_item = self.series.get(old_name or name)
+        default_visible = old_item.visible if old_item else True
+        parsed = self.read_saved_graph_config(name, default_visible)
+        if not parsed:
+            if old_name:
+                self.remove_graph_config_view(old_name)
+            return
+
+        graph_config, visible = parsed
+        if old_name and old_name != name and name in self.series:
+            self.remove_graph_config_view(name)
+            row = self.table_row_for_name(old_name)
+        elif row < 0:
+            row = self.table_row_for_name(old_name or name)
+
+        self.remove_series_curve(old_item)
+        new_item = SeriesData(config=graph_config, curve=self.create_series_curve(graph_config), visible=visible)
+        self.replace_series_in_order(old_name or name if old_item else None, name, new_item)
+
+        self.table.blockSignals(True)
+        self.upsert_series_table_row(row, name, new_item)
+        self.table.blockSignals(False)
+        self.clear_selection_summary()
+        self.refresh_series_visibility()
+
+    def remove_graph_config_view(self, name: str) -> None:
+        item = self.series.pop(name, None)
+        self.remove_series_curve(item)
+        row = self.table_row_for_name(name)
+        if row >= 0:
+            self.table.blockSignals(True)
+            self.table.removeRow(row)
+            self.table.blockSignals(False)
+        self.clear_selection_summary()
+        self.refresh_series_visibility()
 
     def refresh_ports(self) -> None:
         current = self.selected_port_name()
@@ -1557,8 +1702,9 @@ class IntegratedTester(QWidget):
     def add_graph_config(self) -> None:
         dialog = GraphConfigDialog(self)
         if dialog.exec_() == QDialog.Accepted:
-            self.save_graph_config(dialog.get_config())
-            self.load_graph_configs()
+            graph_config = dialog.get_config()
+            self.save_graph_config(graph_config)
+            self.reload_graph_config_view(graph_config.name)
 
     def edit_graph_config(self, row: int) -> None:
         name_item = self.table.item(row, 0)
@@ -1570,8 +1716,9 @@ class IntegratedTester(QWidget):
         old_name = series.config.name
         dialog = GraphConfigDialog(self, series.config)
         if dialog.exec_() == QDialog.Accepted:
-            self.save_graph_config(dialog.get_config(), old_name=old_name)
-            self.load_graph_configs()
+            graph_config = dialog.get_config()
+            self.save_graph_config(graph_config, old_name=old_name)
+            self.reload_graph_config_view(graph_config.name, old_name=old_name, row=row)
 
     def delete_graph_config(self, row: int) -> None:
         name_item = self.table.item(row, 0)
@@ -1595,7 +1742,7 @@ class IntegratedTester(QWidget):
             config.remove_section(name)
             with open(config_path, "w", encoding="utf-8") as file:
                 config.write(file)
-        self.load_graph_configs()
+        self.remove_graph_config_view(name)
 
     def save_graph_config(self, graph_config: GraphConfig, old_name: Optional[str] = None) -> None:
         config_path = self.setting_dir / "table.ini"

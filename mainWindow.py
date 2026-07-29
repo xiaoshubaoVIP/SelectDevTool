@@ -12,7 +12,7 @@ from mypackage.src.SelectDevice import SelectDevice
 from mypackage.src.integrated_tester import IntegratedTester
 
 
-APP_VERSION = "V1.2.7"
+APP_VERSION = "V1.2.8"
 
 
 class MainWindow(QMainWindow):
