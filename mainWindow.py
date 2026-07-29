@@ -12,7 +12,7 @@ from mypackage.src.SelectDevice import SelectDevice
 from mypackage.src.integrated_tester import IntegratedTester
 
 
-APP_VERSION = "V1.3.1"
+APP_VERSION = "V1.2.7"
 
 
 class MainWindow(QMainWindow):
@@ -54,9 +54,9 @@ class MainWindow(QMainWindow):
             root = Path(sys.executable).resolve().parent
             os.chdir(root)
             bundle_root = Path(getattr(sys, "_MEIPASS", root))
-            for dirname in ("setting", "icon"):
-                target = root / dirname
-                source = bundle_root / dirname
+            for relative_dir in (Path("setting"), Path("mypackage") / "resource" / "image"):
+                target = root / relative_dir
+                source = bundle_root / relative_dir
                 if not target.exists() and source.exists():
                     shutil.copytree(source, target)
             return root
