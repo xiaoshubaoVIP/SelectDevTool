@@ -503,13 +503,25 @@ class IntegratedTester(QWidget):
         self.marks: List[MarkData] = []
         self.current_mark: Optional[MarkData] = None
         self.alarm_lines: List[pg.InfiniteLine] = []
+        self.alarm_clear_lines: List[pg.InfiniteLine] = []
         self.last_smoke_state: Optional[int] = None
+        self.alarm_active = False
         self._rescaling_y_axis = False
         self.text_extract_buffer_limit = 65536
         self._last_text_extract_timestamp = 0.0
         self.mark_label_font = QFont("Microsoft YaHei", 7)
         self.cursor_x: Optional[float] = None
-        self.smoke_status_text = ["正常", "校准", "通道1故障", "通道2故障", "水蒸气故障", "EMC故障", "预报", "报警", "静音"]
+        self.smoke_status_text = [
+            "正常",       # 0x00
+            "校准",       # 0x01
+            "通道1故障",  # 0x02
+            "通道2故障",  # 0x03
+            "水蒸气故障", # 0x04
+            "EMC故障",    # 0x05
+            "预报警",     # 0x06
+            "报警",       # 0x07
+            "静音",       # 0x08
+        ]
         self.smoke_type_text = [
             "无",
             "其他",
@@ -1508,8 +1520,15 @@ class IntegratedTester(QWidget):
                 self.smoke_type_label.setText(self.lookup_text(self.smoke_type_text, data[1]))
 
     def update_alarm_trigger(self, timestamp: int, smoke_state: int) -> None:
-        if self.last_smoke_state is not None and self.last_smoke_state != 0x07 and smoke_state == 0x07:
-            self.add_alarm_line(timestamp)
+        if self.last_smoke_state is None:
+            self.alarm_active = smoke_state in (0x07, 0x08)
+        else:
+            if smoke_state == 0x07 and not self.alarm_active:
+                self.add_alarm_line(timestamp)
+                self.alarm_active = True
+            elif smoke_state == 0x00 and self.alarm_active:
+                self.add_alarm_clear_line(timestamp)
+                self.alarm_active = False
         self.last_smoke_state = smoke_state
 
     def add_alarm_line(self, timestamp: int) -> None:
@@ -1521,6 +1540,16 @@ class IntegratedTester(QWidget):
         line.setZValue(18)
         self.plot.addItem(line, ignoreBounds=True)
         self.alarm_lines.append(line)
+
+    def add_alarm_clear_line(self, timestamp: int) -> None:
+        if self.start_timestamp is None:
+            self.start_timestamp = timestamp
+        x_pos = timestamp - self.start_timestamp
+        line = pg.InfiniteLine(pos=x_pos, angle=90, movable=False)
+        line.setPen(pg.mkPen("#00aa44", width=1, style=Qt.DashLine))
+        line.setZValue(18)
+        self.plot.addItem(line, ignoreBounds=True)
+        self.alarm_clear_lines.append(line)
 
     @staticmethod
     def lookup_text(items: List[str], index: int) -> str:
@@ -2168,7 +2197,9 @@ class IntegratedTester(QWidget):
         self.marks.clear()
         self.current_mark = None
         self.alarm_lines.clear()
+        self.alarm_clear_lines.clear()
         self.last_smoke_state = None
+        self.alarm_active = False
         self.cursor_x = None
         self.plot.clear()
         self.legend = self.plot.getPlotItem().legend or self.plot.addLegend()
