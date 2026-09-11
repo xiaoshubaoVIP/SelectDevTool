@@ -78,6 +78,7 @@ class GraphConfig:
     end_text: str = ""
     text_value_type: str = "signed"
     scale: int = 1
+    compensation_enabled: bool = False
 
 
 @dataclass
@@ -313,6 +314,7 @@ class GraphConfigDialog(QDialog):
         self.color = config.color if config else "#000000"
         self.source = config.source if config else "protocol"
         self.configured_type = config.text_value_type if config else "signed"
+        self.compensation_enabled = config.compensation_enabled if config else False
 
         self.protocol_radio = QRadioButton("协议解析")
         self.text_radio = QRadioButton("文本截取")
@@ -341,6 +343,8 @@ class GraphConfigDialog(QDialog):
         self.color_button = QPushButton("")
         self.color_button.setStyleSheet(f"background-color: {self.color};")
         self.color_button.clicked.connect(self.pick_color)
+        self.compensation_check = QCheckBox("温补参数计算")
+        self.compensation_check.setChecked(self.compensation_enabled)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -362,6 +366,7 @@ class GraphConfigDialog(QDialog):
         layout.addRow(self.type_label, self.type_box)
         layout.addRow(self.scale_label, self.scale_edit)
         layout.addRow("颜色", self.color_button)
+        layout.addRow("温补", self.compensation_check)
         layout.addRow(buttons)
 
         self.protocol_radio.toggled.connect(self.update_source_mode)
@@ -424,6 +429,7 @@ class GraphConfigDialog(QDialog):
             end_text=end_text,
             text_value_type=value_type,
             scale=scale,
+            compensation_enabled=self.compensation_check.isChecked(),
         )
 
     def accept(self) -> None:
@@ -1010,6 +1016,17 @@ class IntegratedTester(QWidget):
             return False
         return default
 
+    @staticmethod
+    def config_compensation_state(config: configparser.ConfigParser, section: str, default: bool = False) -> bool:
+        value = config.get(section, "参与温补", fallback="").strip().lower()
+        if not value:
+            return default
+        if value in ("1", "true", "yes", "on", "checked", "参与"):
+            return True
+        if value in ("0", "false", "no", "off", "unchecked", "不参与"):
+            return False
+        return default
+
     def read_graph_config_section(
         self,
         config: configparser.ConfigParser,
@@ -1045,6 +1062,7 @@ class IntegratedTester(QWidget):
                 end_text=config.get(section, "结束字串", fallback=""),
                 text_value_type=text_value_type if source == "text" else integer_type,
                 scale=scale if source == "text" else 1,
+                compensation_enabled=self.config_compensation_state(config, section),
             )
             return graph_config, self.config_visible_state(config, section, default_visible)
         except ValueError:
@@ -1102,6 +1120,7 @@ class IntegratedTester(QWidget):
                     end_text=config.get(section, "结束字串", fallback=""),
                     text_value_type=text_value_type if source == "text" else integer_type,
                     scale=scale if source == "text" else 1,
+                    compensation_enabled=self.config_compensation_state(config, section),
                 )
             except ValueError:
                 continue
@@ -1112,7 +1131,8 @@ class IntegratedTester(QWidget):
 
             row = self.table.rowCount()
             self.table.insertRow(row)
-            name_item = QTableWidgetItem(section)
+            name_item = QTableWidgetItem(self.display_series_name(section, item))
+            name_item.setData(Qt.UserRole, section)
             name_item.setCheckState(Qt.Checked if item.visible else Qt.Unchecked)
             self.table.setItem(row, 0, name_item)
             for col in range(1, 4):
@@ -1147,9 +1167,20 @@ class IntegratedTester(QWidget):
     def table_row_for_name(self, name: str) -> int:
         for row in range(self.table.rowCount()):
             item = self.table.item(row, 0)
-            if item and item.text() == name:
+            if item and self.table_series_name(item) == name:
                 return row
         return -1
+
+    @staticmethod
+    def display_series_name(name: str, item: SeriesData) -> str:
+        return f"{name}(*)" if item.config.compensation_enabled else name
+
+    @staticmethod
+    def table_series_name(item: QTableWidgetItem) -> str:
+        stored_name = item.data(Qt.UserRole)
+        if stored_name is not None:
+            return str(stored_name)
+        return item.text()[:-3] if item.text().endswith("(*)") else item.text()
 
     def upsert_series_table_row(self, row: int, name: str, item: SeriesData) -> int:
         if row < 0:
@@ -1161,7 +1192,8 @@ class IntegratedTester(QWidget):
         if name_item is None:
             name_item = QTableWidgetItem()
             self.table.setItem(row, 0, name_item)
-        name_item.setText(name)
+        name_item.setData(Qt.UserRole, name)
+        name_item.setText(self.display_series_name(name, item))
         name_item.setCheckState(Qt.Checked if item.visible else Qt.Unchecked)
 
         values = [
@@ -1668,11 +1700,12 @@ class IntegratedTester(QWidget):
     def table_item_changed(self, item: QTableWidgetItem) -> None:
         if item.column() != 0:
             return
-        series = self.series.get(item.text())
+        name = self.table_series_name(item)
+        series = self.series.get(name)
         if series and series.curve:
             series.visible = item.checkState() == Qt.Checked
             self.refresh_series_visibility()
-            self.save_series_visible_state(item.text(), series.visible)
+            self.save_series_visible_state(name, series.visible)
 
     def save_series_visible_state(self, name: str, visible: bool) -> None:
         config_path = self.setting_dir / "table.ini"
@@ -1739,7 +1772,8 @@ class IntegratedTester(QWidget):
         name_item = self.table.item(row, 0)
         if not name_item:
             return
-        series = self.series.get(name_item.text())
+        name = self.table_series_name(name_item)
+        series = self.series.get(name)
         if not series:
             return
         old_name = series.config.name
@@ -1753,7 +1787,7 @@ class IntegratedTester(QWidget):
         name_item = self.table.item(row, 0)
         if not name_item:
             return
-        name = name_item.text()
+        name = self.table_series_name(name_item)
         reply = QMessageBox.question(
             self,
             "删除曲线",
@@ -1793,6 +1827,7 @@ class IntegratedTester(QWidget):
 
         config.add_section(graph_config.name)
         config.set(graph_config.name, "显示", "true" if visible else "false")
+        config.set(graph_config.name, "参与温补", "true" if graph_config.compensation_enabled else "false")
         config.set(graph_config.name, "数据获取方式", "文本截取" if graph_config.source == "text" else "协议解析")
         if graph_config.source == "text":
             config.set(graph_config.name, "偏移", "")
