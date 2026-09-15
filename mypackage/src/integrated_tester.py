@@ -6,6 +6,7 @@ import time
 from bisect import bisect_left
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal, ROUND_DOWN
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -65,6 +66,8 @@ from mypackage.src.tester_protocol import (
     hex_to_bytes,
 )
 
+TEMPERATURE_COMPENSATION_STABLE_SECONDS = 4 * 60 * 60
+
 
 @dataclass
 class GraphConfig:
@@ -92,6 +95,13 @@ class SeriesData:
     values: List[int] = field(default_factory=list)
     curve: Optional[pg.PlotDataItem] = None
     text_buffer: str = ""
+
+
+@dataclass
+class TemperatureCompensationSample:
+    timestamp: int
+    temperature: int
+    values: Dict[str, int]
 
 
 class PortComboBox(QComboBox):
@@ -512,6 +522,12 @@ class IntegratedTester(QWidget):
         self.alarm_clear_lines: List[pg.InfiniteLine] = []
         self.last_smoke_state: Optional[int] = None
         self.alarm_active = False
+        self.temperature_compensation_enabled = False
+        self.temperature_compensation_phase = "idle"
+        self.temperature_compensation_samples: List[TemperatureCompensationSample] = []
+        self.temperature_compensation_result: Optional[List[Dict[str, object]]] = None
+        self.temperature_compensation_peak_temperature: Optional[int] = None
+        self.temperature_compensation_peak_stable_since: Optional[int] = None
         self._rescaling_y_axis = False
         self.text_extract_buffer_limit = 65536
         self._last_text_extract_timestamp = 0.0
@@ -600,12 +616,16 @@ class IntegratedTester(QWidget):
         self.mark_button.clicked.connect(self.toggle_mark)
         self.locate_button = QPushButton("定位")
         self.locate_button.clicked.connect(self.locate_mark)
+        self.temperature_compensation_check = QCheckBox("开启温补参数统计")
+        self.temperature_compensation_check.stateChanged.connect(self.toggle_temperature_compensation)
 
         for widget in [
             self.open_button,
             self.port_box,
             self.baud_box,
             self.save_button,
+            self.locate_button,
+            self.mark_button,
         ]:
             uart_layout.addWidget(widget)
         uart_layout.addStretch(1)
@@ -619,8 +639,7 @@ class IntegratedTester(QWidget):
             self.mark_note,
             QLabel("角度"),
             self.angle_box,
-            self.locate_button,
-            self.mark_button,
+            self.temperature_compensation_check,
         ]:
             mark_layout.addWidget(widget)
         mark_layout.addStretch(1)
@@ -702,7 +721,7 @@ class IntegratedTester(QWidget):
         left_layout.addLayout(info_layout)
         left_layout.addLayout(mark_layout)
         left_layout.addWidget(self.left_content_splitter, 1)
-        left_panel_width = mark_layout.sizeHint().width() + 8
+        left_panel_width = max(mark_layout.sizeHint().width(), uart_layout.sizeHint().width()) + 8
         left.setMaximumWidth(left_panel_width)
 
         self.plot_view = AxisZoomViewBox()
@@ -1173,14 +1192,14 @@ class IntegratedTester(QWidget):
 
     @staticmethod
     def display_series_name(name: str, item: SeriesData) -> str:
-        return f"{name}(*)" if item.config.compensation_enabled else name
+        return f"{name}(温)" if item.config.compensation_enabled else name
 
     @staticmethod
     def table_series_name(item: QTableWidgetItem) -> str:
         stored_name = item.data(Qt.UserRole)
         if stored_name is not None:
             return str(stored_name)
-        return item.text()[:-3] if item.text().endswith("(*)") else item.text()
+        return item.text()[:-3] if item.text().endswith("(温)") else item.text()
 
     def upsert_series_table_row(self, row: int, name: str, item: SeriesData) -> int:
         if row < 0:
@@ -1494,6 +1513,276 @@ class IntegratedTester(QWidget):
                 self.update_curve(item, rescale=False)
             updated = True
 
+        if updated and self.temperature_compensation_enabled:
+            self.record_temperature_compensation_sample(timestamp)
+
+    def temperature_compensation_items(self) -> List[tuple[str, SeriesData]]:
+        temperature_item = self.temperature_series()
+        return [
+            (name, item)
+            for name, item in self.series.items()
+            if item.config.compensation_enabled and item is not temperature_item
+        ]
+
+    def temperature_series(self) -> Optional[SeriesData]:
+        item = self.series.get("温度")
+        if item is not None:
+            return item
+        for item in self.series.values():
+            if item.config.name == "温度":
+                return item
+        return None
+
+    def toggle_temperature_compensation(self, state: int) -> None:
+        if state != Qt.Checked:
+            self.temperature_compensation_enabled = False
+            self.temperature_compensation_phase = "idle"
+            self.temperature_compensation_samples.clear()
+            self.temperature_compensation_result = None
+            self.temperature_compensation_peak_temperature = None
+            self.temperature_compensation_peak_stable_since = None
+            return
+
+        temperature_item = self.temperature_series()
+        selected_items = self.temperature_compensation_items()
+        invalid_items = [name for name, item in selected_items if item.config.source != "protocol"]
+        if temperature_item is None or temperature_item.config.source != "protocol":
+            QMessageBox.warning(self, "温度补偿", "未找到协议解析的“温度”曲线")
+            self.temperature_compensation_check.blockSignals(True)
+            self.temperature_compensation_check.setChecked(False)
+            self.temperature_compensation_check.blockSignals(False)
+            return
+        if not selected_items:
+            QMessageBox.warning(self, "温度补偿", "请先在“编辑曲线”中勾选温补参数计算曲线")
+            self.temperature_compensation_check.blockSignals(True)
+            self.temperature_compensation_check.setChecked(False)
+            self.temperature_compensation_check.blockSignals(False)
+            return
+        if invalid_items:
+            QMessageBox.warning(
+                self,
+                "温度补偿",
+                f"以下曲线不是协议解析曲线，不能参与温补计算：{', '.join(invalid_items)}",
+            )
+            self.temperature_compensation_check.blockSignals(True)
+            self.temperature_compensation_check.setChecked(False)
+            self.temperature_compensation_check.blockSignals(False)
+            return
+
+        self.temperature_compensation_enabled = True
+        self.temperature_compensation_phase = "seeking_min"
+        self.temperature_compensation_samples.clear()
+        self.temperature_compensation_result = None
+        self.temperature_compensation_peak_temperature = None
+        self.temperature_compensation_peak_stable_since = None
+        self.append_protocol_log("温度补偿参数计算已启动")
+
+    def record_temperature_compensation_sample(self, timestamp: int) -> None:
+        if self.temperature_compensation_phase == "complete":
+            return
+        temperature_item = self.temperature_series()
+        selected_items = self.temperature_compensation_items()
+        if temperature_item is None or not selected_items:
+            return
+        if not temperature_item.timestamps or temperature_item.timestamps[-1] != timestamp:
+            return
+        values: Dict[str, int] = {}
+        for name, item in selected_items:
+            if not item.timestamps or item.timestamps[-1] != timestamp:
+                return
+            values[name] = item.values[-1]
+        temperature = int(round(temperature_item.values[-1]))
+        sample = TemperatureCompensationSample(timestamp, temperature, values)
+
+        if self.temperature_compensation_phase == "seeking_min":
+            if not self.temperature_compensation_samples:
+                self.temperature_compensation_samples.append(sample)
+                return
+            minimum = self.temperature_compensation_samples[0].temperature
+            if temperature < minimum:
+                self.temperature_compensation_samples = [sample]
+                return
+            self.temperature_compensation_samples.append(sample)
+            if temperature > minimum:
+                self.temperature_compensation_phase = "ascending"
+                self.temperature_compensation_peak_temperature = temperature
+                self.temperature_compensation_peak_stable_since = sample.timestamp
+            return
+
+        if self.temperature_compensation_phase != "ascending":
+            return
+        minimum = min(item.temperature for item in self.temperature_compensation_samples)
+        peak = self.temperature_compensation_peak_temperature
+        if peak is None or temperature > peak:
+            self.temperature_compensation_samples.append(sample)
+            self.temperature_compensation_peak_temperature = temperature
+            self.temperature_compensation_peak_stable_since = sample.timestamp
+            return
+        if temperature < minimum:
+            self.temperature_compensation_samples = [sample]
+            self.temperature_compensation_phase = "seeking_min"
+            self.temperature_compensation_peak_temperature = None
+            self.temperature_compensation_peak_stable_since = None
+            return
+
+        self.temperature_compensation_samples.append(sample)
+        if temperature < peak:
+            self.temperature_compensation_peak_stable_since = None
+            return
+
+        stable_since = self.temperature_compensation_peak_stable_since
+        if stable_since is None:
+            self.temperature_compensation_peak_stable_since = sample.timestamp
+            return
+        if sample.timestamp - stable_since < TEMPERATURE_COMPENSATION_STABLE_SECONDS:
+            return
+
+        self.temperature_compensation_phase = "complete"
+        self.temperature_compensation_enabled = False
+        self.finish_temperature_compensation()
+
+    def finish_temperature_compensation(self) -> None:
+        result, errors = self.calculate_temperature_compensation()
+        self.temperature_compensation_result = result
+        if errors:
+            QMessageBox.warning(self, "温度补偿", "温度补偿参数无法计算：\n" + "\n".join(errors))
+            self.temperature_compensation_result = None
+            self._reset_temperature_compensation_checkbox()
+            return
+
+        QMessageBox.information(self, "温度补偿", "温度补偿参数计算完成，点击确定后选择 Excel 保存位置。")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "保存温度补偿参数",
+            str(self.output_dir / f"TemperatureCompensation_{time.strftime('%Y-%m-%d_%H-%M-%S')}.xlsx"),
+            "Excel Files (*.xlsx)",
+        )
+        if file_path:
+            if not file_path.lower().endswith(".xlsx"):
+                file_path += ".xlsx"
+            try:
+                self.export_temperature_compensation(file_path, result or [])
+                QMessageBox.information(self, "温度补偿", "温度补偿参数保存完成。")
+            except Exception as exc:
+                QMessageBox.critical(self, "温度补偿", f"保存温度补偿参数失败：{exc}")
+        self._reset_temperature_compensation_checkbox()
+
+    def _reset_temperature_compensation_checkbox(self) -> None:
+        self.temperature_compensation_check.blockSignals(True)
+        self.temperature_compensation_check.setChecked(False)
+        self.temperature_compensation_check.blockSignals(False)
+        self.temperature_compensation_enabled = False
+        self.temperature_compensation_phase = "idle"
+
+    def calculate_temperature_compensation(self) -> tuple[Optional[List[Dict[str, object]]], List[str]]:
+        temperature_item = self.temperature_series()
+        selected_items = self.temperature_compensation_items()
+        if temperature_item is None or not selected_items:
+            return None, ["缺少温度曲线或温补参数曲线"]
+        if not self.temperature_compensation_samples:
+            return None, ["没有采集到有效的温度补偿数据"]
+
+        groups: Dict[int, List[List[TemperatureCompensationSample]]] = {}
+        current_group: List[TemperatureCompensationSample] = []
+        for sample in self.temperature_compensation_samples:
+            if current_group and sample.temperature != current_group[-1].temperature:
+                groups.setdefault(current_group[-1].temperature, []).append(current_group)
+                current_group = []
+            current_group.append(sample)
+        if current_group:
+            groups.setdefault(current_group[-1].temperature, []).append(current_group)
+
+        minimum = min(sample.temperature for sample in self.temperature_compensation_samples)
+        maximum = max(sample.temperature for sample in self.temperature_compensation_samples)
+        errors: List[str] = []
+        result: List[Dict[str, object]] = []
+        for temperature in range(minimum, maximum + 1):
+            candidates = groups.get(temperature, [])
+            if not candidates:
+                errors.append(f"{temperature}℃没有连续采样数据")
+                continue
+            samples = max(candidates, key=len)
+            if len(samples) < 5:
+                errors.append(f"{temperature}℃只有{len(samples)}个连续值，少于5个")
+                continue
+            start = (len(samples) - 5 + 1) // 2
+            selected_samples = samples[start : start + 5]
+            averages = {
+                name: Decimal(sum(sample.values[name] for sample in selected_samples)) / Decimal(5)
+                for name, _ in selected_items
+            }
+            result.append(
+                {
+                    "temperature": temperature,
+                    "raw_count": len(samples),
+                    "samples": selected_samples,
+                    "averages": averages,
+                }
+            )
+
+        base_row = next((row for row in result if row["temperature"] == 25), None)
+        if base_row is None:
+            errors.append("缺少25℃基准数据")
+        else:
+            base_averages = base_row["averages"]
+            for row in result:
+                coefficients: Dict[str, Decimal] = {}
+                for name, _ in selected_items:
+                    average = row["averages"][name]
+                    base = base_averages[name]
+                    if average == 0:
+                        errors.append(f"{row['temperature']}℃的{name}平均值为0，无法计算系数")
+                    else:
+                        coefficients[name] = (base / average).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+                row["coefficients"] = coefficients
+
+        return (result if not errors else None), errors
+
+    def export_temperature_compensation(self, file_path: str, result: List[Dict[str, object]]) -> None:
+        selected_items = self.temperature_compensation_items()
+        names = [name for name, _ in selected_items]
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "温补参数"
+        ws.append(["温度(℃)"] + [field for name in names for field in (f"{name}平均值", f"{name}补偿系数")])
+        for row in result:
+            averages = row["averages"]
+            coefficients = row["coefficients"]
+            values: List[object] = [row["temperature"]]
+            for name in names:
+                values.extend([float(averages[name]), float(coefficients[name])])
+            ws.append(values)
+        for row in ws.iter_rows(min_row=2):
+            for column in range(3, ws.max_column + 1, 2):
+                row[column - 1].number_format = "0.000"
+
+        detail = wb.create_sheet("计算明细")
+        detail.append(["温度(℃)", "参数名称", "连续值数量", "取值1", "取值2", "取值3", "取值4", "取值5", "平均值", "25℃基准值", "补偿系数"])
+        base_row = next(row for row in result if row["temperature"] == 25)
+        for row in result:
+            for name in names:
+                values = [sample.values[name] for sample in row["samples"]]
+                detail.append(
+                    [
+                        row["temperature"],
+                        name,
+                        row["raw_count"],
+                        *values,
+                        float(row["averages"][name]),
+                        float(base_row["averages"][name]),
+                        float(row["coefficients"][name]),
+                    ]
+                )
+        for row in detail.iter_rows(min_row=2):
+            row[10].number_format = "0.000"
+
+        for sheet in (ws, detail):
+            sheet.freeze_panes = "A2"
+            for column in sheet.columns:
+                width = min(max(len(str(cell.value or "")) for cell in column) + 2, 28)
+                sheet.column_dimensions[column[0].column_letter].width = width
+        wb.save(file_path)
+
     def append_series_value(self, item: SeriesData, timestamp: int, value: int) -> None:
         if item.timestamps and item.timestamps[-1] == timestamp:
             old_value = item.values[-1]
@@ -1541,7 +1830,8 @@ class IntegratedTester(QWidget):
             if len(data) >= 1:
                 self.device_fault_label.setText(self.format_device_fault(data[0]))
             if len(data) >= 2:
-                self.device_temp_label.setText(str(data[1]))
+                temperature = int.from_bytes(data[1:2], "big", signed=True)
+                self.device_temp_label.setText(str(temperature))
             if len(data) >= 4:
                 battery = int.from_bytes(data[2:4], "big", signed=False)
                 self.device_battery_label.setText(str(battery))
@@ -2235,6 +2525,15 @@ class IntegratedTester(QWidget):
         self.alarm_clear_lines.clear()
         self.last_smoke_state = None
         self.alarm_active = False
+        self.temperature_compensation_enabled = False
+        self.temperature_compensation_phase = "idle"
+        self.temperature_compensation_samples.clear()
+        self.temperature_compensation_result = None
+        self.temperature_compensation_peak_temperature = None
+        self.temperature_compensation_peak_stable_since = None
+        self.temperature_compensation_check.blockSignals(True)
+        self.temperature_compensation_check.setChecked(False)
+        self.temperature_compensation_check.blockSignals(False)
         self.cursor_x = None
         self.plot.clear()
         self.legend = self.plot.getPlotItem().legend or self.plot.addLegend()
