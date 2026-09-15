@@ -24,6 +24,7 @@ from PyQt5.QtWidgets import (
     QColorDialog,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QGraphicsRectItem,
@@ -41,6 +42,7 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QSizePolicy,
     QSplitter,
+    QSpinBox,
     QStackedWidget,
     QStyle,
     QStyleOptionComboBox,
@@ -66,7 +68,8 @@ from mypackage.src.tester_protocol import (
     hex_to_bytes,
 )
 
-TEMPERATURE_COMPENSATION_STABLE_SECONDS = 4 * 60 * 60
+TEMPERATURE_COMPENSATION_SECTION = "temperature_compensation"
+TEMPERATURE_COMPENSATION_COEFFICIENT_SCALE = Decimal(1000)
 
 
 @dataclass
@@ -102,6 +105,25 @@ class TemperatureCompensationSample:
     timestamp: int
     temperature: int
     values: Dict[str, int]
+
+
+@dataclass
+class TemperatureCompensationSettings:
+    sample_count: int = 5
+    peak_stable_hours: float = 4.0
+    decimal_places: int = 3
+
+    @property
+    def peak_stable_seconds(self) -> float:
+        return self.peak_stable_hours * 60 * 60
+
+    @property
+    def coefficient_quantizer(self) -> Decimal:
+        return Decimal(1).scaleb(-self.decimal_places)
+
+    @property
+    def scaled_decimal_places(self) -> int:
+        return max(0, self.decimal_places - 3)
 
 
 class PortComboBox(QComboBox):
@@ -460,6 +482,47 @@ class GraphConfigDialog(QDialog):
         super().accept()
 
 
+class TemperatureCompensationSettingsDialog(QDialog):
+    def __init__(self, parent, settings: TemperatureCompensationSettings) -> None:
+        super().__init__(parent)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        self.setWindowTitle("温补参数设置")
+
+        self.sample_count_spin = QSpinBox()
+        self.sample_count_spin.setRange(1, 1000)
+        self.sample_count_spin.setValue(settings.sample_count)
+        self.sample_count_spin.setSuffix(" 个")
+
+        self.peak_stable_hours_spin = QDoubleSpinBox()
+        self.peak_stable_hours_spin.setRange(0.01, 10000.0)
+        self.peak_stable_hours_spin.setDecimals(2)
+        self.peak_stable_hours_spin.setSingleStep(0.5)
+        self.peak_stable_hours_spin.setValue(settings.peak_stable_hours)
+        self.peak_stable_hours_spin.setSuffix(" 小时")
+
+        self.decimal_places_spin = QSpinBox()
+        self.decimal_places_spin.setRange(0, 9)
+        self.decimal_places_spin.setValue(settings.decimal_places)
+        self.decimal_places_spin.setSuffix(" 位")
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        layout = QFormLayout(self)
+        layout.addRow("同一温度连续取值数量", self.sample_count_spin)
+        layout.addRow("最高温度连续保持时间", self.peak_stable_hours_spin)
+        layout.addRow("补偿参数小数位数（结果×1000）", self.decimal_places_spin)
+        layout.addRow(buttons)
+
+    def selected_settings(self) -> TemperatureCompensationSettings:
+        return TemperatureCompensationSettings(
+            sample_count=self.sample_count_spin.value(),
+            peak_stable_hours=self.peak_stable_hours_spin.value(),
+            decimal_places=self.decimal_places_spin.value(),
+        )
+
+
 class SerialReader(QThread):
     data_received = pyqtSignal(bytes)
     state_changed = pyqtSignal(bool, str)
@@ -509,6 +572,7 @@ class IntegratedTester(QWidget):
         self.setting_dir.mkdir(exist_ok=True)
         self.output_dir.mkdir(exist_ok=True)
         self.log_dir.mkdir(exist_ok=True)
+        self.temperature_compensation_settings = self.load_temperature_compensation_settings()
 
         self.parser = FrameParser()
         self.serial_thread: Optional[SerialReader] = None
@@ -587,6 +651,72 @@ class IntegratedTester(QWidget):
             if text:
                 items.append(text)
         return items or fallback
+
+    def load_temperature_compensation_settings(self) -> TemperatureCompensationSettings:
+        settings = TemperatureCompensationSettings()
+        config_path = self.setting_dir / "setting.ini"
+        if not config_path.exists():
+            return settings
+
+        config = configparser.ConfigParser()
+        try:
+            config.read(config_path, encoding="utf-8-sig")
+            if not config.has_section(TEMPERATURE_COMPENSATION_SECTION):
+                return settings
+            sample_count = config.getint(
+                TEMPERATURE_COMPENSATION_SECTION,
+                "sample_count",
+                fallback=settings.sample_count,
+            )
+            peak_stable_hours = config.getfloat(
+                TEMPERATURE_COMPENSATION_SECTION,
+                "peak_stable_hours",
+                fallback=settings.peak_stable_hours,
+            )
+            decimal_places = config.getint(
+                TEMPERATURE_COMPENSATION_SECTION,
+                "decimal_places",
+                fallback=settings.decimal_places,
+            )
+        except (configparser.Error, ValueError):
+            return settings
+
+        if not math.isfinite(peak_stable_hours):
+            peak_stable_hours = settings.peak_stable_hours
+        return TemperatureCompensationSettings(
+            sample_count=min(max(sample_count, 1), 1000),
+            peak_stable_hours=min(max(peak_stable_hours, 0.01), 10000.0),
+            decimal_places=min(max(decimal_places, 0), 9),
+        )
+
+    def save_temperature_compensation_settings(
+        self,
+        settings: TemperatureCompensationSettings,
+    ) -> bool:
+        config_path = self.setting_dir / "setting.ini"
+        config = configparser.ConfigParser()
+        config.optionxform = str
+        try:
+            if config_path.exists():
+                config.read(config_path, encoding="utf-8-sig")
+            if not config.has_section(TEMPERATURE_COMPENSATION_SECTION):
+                config.add_section(TEMPERATURE_COMPENSATION_SECTION)
+            config.set(TEMPERATURE_COMPENSATION_SECTION, "sample_count", str(settings.sample_count))
+            config.set(TEMPERATURE_COMPENSATION_SECTION, "peak_stable_hours", f"{settings.peak_stable_hours:g}")
+            config.set(TEMPERATURE_COMPENSATION_SECTION, "decimal_places", str(settings.decimal_places))
+            with config_path.open("w", encoding="utf-8-sig") as handle:
+                config.write(handle)
+        except (configparser.Error, OSError) as exc:
+            QMessageBox.critical(self, "温补参数设置", f"保存设置失败：{exc}")
+            return False
+
+        self.temperature_compensation_settings = settings
+        return True
+
+    def show_temperature_compensation_settings(self) -> None:
+        dialog = TemperatureCompensationSettingsDialog(self, self.temperature_compensation_settings)
+        if dialog.exec_() == QDialog.Accepted:
+            self.save_temperature_compensation_settings(dialog.selected_settings())
 
     def _build_ui(self) -> None:
         main_layout = QVBoxLayout(self)
@@ -1634,7 +1764,7 @@ class IntegratedTester(QWidget):
         if stable_since is None:
             self.temperature_compensation_peak_stable_since = sample.timestamp
             return
-        if sample.timestamp - stable_since < TEMPERATURE_COMPENSATION_STABLE_SECONDS:
+        if sample.timestamp - stable_since < self.temperature_compensation_settings.peak_stable_seconds:
             return
 
         self.temperature_compensation_phase = "complete"
@@ -1696,19 +1826,20 @@ class IntegratedTester(QWidget):
         maximum = max(sample.temperature for sample in self.temperature_compensation_samples)
         errors: List[str] = []
         result: List[Dict[str, object]] = []
+        sample_count = self.temperature_compensation_settings.sample_count
         for temperature in range(minimum, maximum + 1):
             candidates = groups.get(temperature, [])
             if not candidates:
                 errors.append(f"{temperature}℃没有连续采样数据")
                 continue
             samples = max(candidates, key=len)
-            if len(samples) < 5:
-                errors.append(f"{temperature}℃只有{len(samples)}个连续值，少于5个")
+            if len(samples) < sample_count:
+                errors.append(f"{temperature}℃只有{len(samples)}个连续值，少于{sample_count}个")
                 continue
-            start = (len(samples) - 5 + 1) // 2
-            selected_samples = samples[start : start + 5]
+            start = (len(samples) - sample_count + 1) // 2
+            selected_samples = samples[start : start + sample_count]
             averages = {
-                name: Decimal(sum(sample.values[name] for sample in selected_samples)) / Decimal(5)
+                name: Decimal(sum(sample.values[name] for sample in selected_samples)) / Decimal(sample_count)
                 for name, _ in selected_items
             }
             result.append(
@@ -1725,6 +1856,7 @@ class IntegratedTester(QWidget):
             errors.append("缺少25℃基准数据")
         else:
             base_averages = base_row["averages"]
+            quantizer = self.temperature_compensation_settings.coefficient_quantizer
             for row in result:
                 coefficients: Dict[str, Decimal] = {}
                 for name, _ in selected_items:
@@ -1733,7 +1865,8 @@ class IntegratedTester(QWidget):
                     if average == 0:
                         errors.append(f"{row['temperature']}℃的{name}平均值为0，无法计算系数")
                     else:
-                        coefficients[name] = (base / average).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+                        ratio = (base / average).quantize(quantizer, rounding=ROUND_DOWN)
+                        coefficients[name] = ratio * TEMPERATURE_COMPENSATION_COEFFICIENT_SCALE
                 row["coefficients"] = coefficients
 
         return (result if not errors else None), errors
@@ -1744,7 +1877,10 @@ class IntegratedTester(QWidget):
         wb = Workbook()
         ws = wb.active
         ws.title = "温补参数"
-        ws.append(["温度(℃)"] + [field for name in names for field in (f"{name}平均值", f"{name}补偿系数")])
+        ws.append(
+            ["温度(℃)"]
+            + [field for name in names for field in (f"{name}平均值", f"{name}补偿参数(×1000)")]
+        )
         for row in result:
             averages = row["averages"]
             coefficients = row["coefficients"]
@@ -1752,12 +1888,23 @@ class IntegratedTester(QWidget):
             for name in names:
                 values.extend([float(averages[name]), float(coefficients[name])])
             ws.append(values)
+        coefficient_format = "0"
+        if self.temperature_compensation_settings.scaled_decimal_places:
+            coefficient_format += "." + "0" * self.temperature_compensation_settings.scaled_decimal_places
         for row in ws.iter_rows(min_row=2):
             for column in range(3, ws.max_column + 1, 2):
-                row[column - 1].number_format = "0.000"
+                row[column - 1].number_format = coefficient_format
 
         detail = wb.create_sheet("计算明细")
-        detail.append(["温度(℃)", "参数名称", "连续值数量", "取值1", "取值2", "取值3", "取值4", "取值5", "平均值", "25℃基准值", "补偿系数"])
+        sample_headers = [
+            f"取值{index}"
+            for index in range(1, self.temperature_compensation_settings.sample_count + 1)
+        ]
+        detail.append(
+            ["温度(℃)", "参数名称", "连续值数量"]
+            + sample_headers
+            + ["平均值", "25℃基准值", "补偿参数(×1000)"]
+        )
         base_row = next(row for row in result if row["temperature"] == 25)
         for row in result:
             for name in names:
@@ -1773,8 +1920,9 @@ class IntegratedTester(QWidget):
                         float(row["coefficients"][name]),
                     ]
                 )
+        coefficient_index = self.temperature_compensation_settings.sample_count + 5
         for row in detail.iter_rows(min_row=2):
-            row[10].number_format = "0.000"
+            row[coefficient_index].number_format = coefficient_format
 
         for sheet in (ws, detail):
             sheet.freeze_panes = "A2"

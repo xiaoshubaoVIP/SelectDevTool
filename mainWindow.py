@@ -78,6 +78,10 @@ class MainWindow(QMainWindow):
         open_setting_action.triggered.connect(self.open_filter_setting)
         setting_menu.addAction(open_setting_action)
 
+        temperature_compensation_action = QAction("温补参数设置", self)
+        temperature_compensation_action.triggered.connect(self.open_temperature_compensation_settings)
+        setting_menu.addAction(temperature_compensation_action)
+
     def tester_import_log(self) -> None:
         self.tabs.setCurrentWidget(self.tester_page)
         self.tester_page.import_log_dialog()
@@ -92,6 +96,10 @@ class MainWindow(QMainWindow):
             os.startfile(setting_path)
             return
         QFileDialog.getOpenFileName(self, "打开设置文件", str(self.root / "setting"), "Excel Files (*.xlsx)")
+
+    def open_temperature_compensation_settings(self) -> None:
+        self.tabs.setCurrentWidget(self.tester_page)
+        self.tester_page.show_temperature_compensation_settings()
 
     def closeEvent(self, event) -> None:
         self.tester_page.close()
