@@ -3,6 +3,7 @@ import math
 import os
 import re
 import time
+import unicodedata
 from bisect import bisect_left
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -592,6 +593,7 @@ class IntegratedTester(QWidget):
         self.temperature_compensation_result: Optional[List[Dict[str, object]]] = None
         self.temperature_compensation_peak_temperature: Optional[int] = None
         self.temperature_compensation_peak_stable_since: Optional[int] = None
+        self.temperature_compensation_started_at: Optional[float] = None
         self._rescaling_y_axis = False
         self.text_extract_buffer_limit = 65536
         self._last_text_extract_timestamp = 0.0
@@ -747,7 +749,18 @@ class IntegratedTester(QWidget):
         self.locate_button = QPushButton("定位")
         self.locate_button.clicked.connect(self.locate_mark)
         self.temperature_compensation_check = QCheckBox("开启温补参数统计")
-        self.temperature_compensation_check.stateChanged.connect(self.toggle_temperature_compensation)
+        self.temperature_compensation_check.clicked.connect(self.toggle_temperature_compensation)
+        self.temperature_compensation_elapsed_label = QLabel("00:00")
+        self.temperature_compensation_elapsed_label.setAlignment(Qt.AlignCenter)
+        self.temperature_compensation_elapsed_label.setMinimumWidth(62)
+        self.temperature_compensation_elapsed_label.setFixedHeight(24)
+        self.temperature_compensation_elapsed_label.setFont(QFont("Consolas", 10, QFont.Bold))
+        self.temperature_compensation_elapsed_label.setStyleSheet(
+            "QLabel { background-color: #16a34a; color: white; border-radius: 3px; padding: 0 6px; }"
+        )
+        self.temperature_compensation_elapsed_timer = QtCore.QTimer(self)
+        self.temperature_compensation_elapsed_timer.setInterval(1000)
+        self.temperature_compensation_elapsed_timer.timeout.connect(self.update_temperature_compensation_elapsed)
 
         for widget in [
             self.open_button,
@@ -770,6 +783,7 @@ class IntegratedTester(QWidget):
             QLabel("角度"),
             self.angle_box,
             self.temperature_compensation_check,
+            self.temperature_compensation_elapsed_label,
         ]:
             mark_layout.addWidget(widget)
         mark_layout.addStretch(1)
@@ -853,6 +867,7 @@ class IntegratedTester(QWidget):
         left_layout.addWidget(self.left_content_splitter, 1)
         left_panel_width = max(mark_layout.sizeHint().width(), uart_layout.sizeHint().width()) + 8
         left.setMaximumWidth(left_panel_width)
+        self.temperature_compensation_elapsed_label.hide()
 
         self.plot_view = AxisZoomViewBox()
         self.plot_view.selectionChanged.connect(self.handle_plot_selection)
@@ -1663,40 +1678,30 @@ class IntegratedTester(QWidget):
                 return item
         return None
 
-    def toggle_temperature_compensation(self, state: int) -> None:
-        if state != Qt.Checked:
+    def toggle_temperature_compensation(self, checked: bool) -> None:
+        if not checked:
             self.temperature_compensation_enabled = False
             self.temperature_compensation_phase = "idle"
             self.temperature_compensation_samples.clear()
             self.temperature_compensation_result = None
             self.temperature_compensation_peak_temperature = None
             self.temperature_compensation_peak_stable_since = None
+            self.stop_temperature_compensation_elapsed()
             return
 
         temperature_item = self.temperature_series()
         selected_items = self.temperature_compensation_items()
         invalid_items = [name for name, item in selected_items if item.config.source != "protocol"]
         if temperature_item is None or temperature_item.config.source != "protocol":
-            QMessageBox.warning(self, "温度补偿", "未找到协议解析的“温度”曲线")
-            self.temperature_compensation_check.blockSignals(True)
-            self.temperature_compensation_check.setChecked(False)
-            self.temperature_compensation_check.blockSignals(False)
+            self.reject_temperature_compensation_start("未找到协议解析的“温度”曲线")
             return
         if not selected_items:
-            QMessageBox.warning(self, "温度补偿", "请先在“编辑曲线”中勾选温补参数计算曲线")
-            self.temperature_compensation_check.blockSignals(True)
-            self.temperature_compensation_check.setChecked(False)
-            self.temperature_compensation_check.blockSignals(False)
+            self.reject_temperature_compensation_start("请先在“编辑曲线”中勾选温补参数计算曲线")
             return
         if invalid_items:
-            QMessageBox.warning(
-                self,
-                "温度补偿",
+            self.reject_temperature_compensation_start(
                 f"以下曲线不是协议解析曲线，不能参与温补计算：{', '.join(invalid_items)}",
             )
-            self.temperature_compensation_check.blockSignals(True)
-            self.temperature_compensation_check.setChecked(False)
-            self.temperature_compensation_check.blockSignals(False)
             return
 
         self.temperature_compensation_enabled = True
@@ -1705,7 +1710,38 @@ class IntegratedTester(QWidget):
         self.temperature_compensation_result = None
         self.temperature_compensation_peak_temperature = None
         self.temperature_compensation_peak_stable_since = None
+        self.start_temperature_compensation_elapsed()
         self.append_protocol_log("温度补偿参数计算已启动")
+
+    def reject_temperature_compensation_start(self, message: str) -> None:
+        self.temperature_compensation_check.blockSignals(True)
+        self.temperature_compensation_check.setChecked(False)
+        self.temperature_compensation_check.blockSignals(False)
+        self.temperature_compensation_enabled = False
+        self.temperature_compensation_phase = "idle"
+        self.stop_temperature_compensation_elapsed()
+        QMessageBox.warning(self, "温度补偿", message)
+
+    def start_temperature_compensation_elapsed(self) -> None:
+        self.temperature_compensation_started_at = time.time()
+        self.temperature_compensation_elapsed_label.setText("00:00")
+        self.temperature_compensation_elapsed_label.show()
+        self.temperature_compensation_elapsed_timer.start()
+
+    def stop_temperature_compensation_elapsed(self) -> None:
+        self.temperature_compensation_elapsed_timer.stop()
+        self.temperature_compensation_started_at = None
+        self.temperature_compensation_elapsed_label.setText("00:00")
+        self.temperature_compensation_elapsed_label.hide()
+
+    def update_temperature_compensation_elapsed(self) -> None:
+        if self.temperature_compensation_started_at is None:
+            return
+        elapsed_seconds = max(0, int(time.time() - self.temperature_compensation_started_at))
+        hours, remainder = divmod(elapsed_seconds, 60 * 60)
+        minutes = remainder // 60
+        separator = ":" if elapsed_seconds % 2 == 0 else " "
+        self.temperature_compensation_elapsed_label.setText(f"{hours:02d}{separator}{minutes:02d}")
 
     def record_temperature_compensation_sample(self, timestamp: int) -> None:
         if self.temperature_compensation_phase == "complete":
@@ -1803,6 +1839,7 @@ class IntegratedTester(QWidget):
         self.temperature_compensation_check.blockSignals(False)
         self.temperature_compensation_enabled = False
         self.temperature_compensation_phase = "idle"
+        self.stop_temperature_compensation_elapsed()
 
     def calculate_temperature_compensation(self) -> tuple[Optional[List[Dict[str, object]]], List[str]]:
         temperature_item = self.temperature_series()
@@ -1895,24 +1932,24 @@ class IntegratedTester(QWidget):
             for column in range(3, ws.max_column + 1, 2):
                 row[column - 1].number_format = coefficient_format
 
-        detail = wb.create_sheet("计算明细")
         sample_headers = [
             f"取值{index}"
             for index in range(1, self.temperature_compensation_settings.sample_count + 1)
         ]
-        detail.append(
-            ["温度(℃)", "参数名称", "连续值数量"]
-            + sample_headers
-            + ["平均值", "25℃基准值", "补偿参数(×1000)"]
-        )
         base_row = next(row for row in result if row["temperature"] == 25)
-        for row in result:
-            for name in names:
+        used_sheet_titles = {ws.title.casefold()}
+        for name in names:
+            detail = wb.create_sheet(self.unique_excel_sheet_title(name, used_sheet_titles))
+            detail.append(
+                ["温度(℃)", "连续值数量"]
+                + sample_headers
+                + ["平均值", "25℃基准值", "补偿参数(×1000)"]
+            )
+            for row in result:
                 values = [sample.values[name] for sample in row["samples"]]
                 detail.append(
                     [
                         row["temperature"],
-                        name,
                         row["raw_count"],
                         *values,
                         float(row["averages"][name]),
@@ -1920,16 +1957,34 @@ class IntegratedTester(QWidget):
                         float(row["coefficients"][name]),
                     ]
                 )
-        coefficient_index = self.temperature_compensation_settings.sample_count + 5
-        for row in detail.iter_rows(min_row=2):
-            row[coefficient_index].number_format = coefficient_format
+            coefficient_index = self.temperature_compensation_settings.sample_count + 4
+            for detail_row in detail.iter_rows(min_row=2):
+                detail_row[coefficient_index].number_format = coefficient_format
 
-        for sheet in (ws, detail):
+        for sheet in wb.worksheets:
             sheet.freeze_panes = "A2"
             for column in sheet.columns:
-                width = min(max(len(str(cell.value or "")) for cell in column) + 2, 28)
+                width = min(max(self.excel_display_width(cell.value) for cell in column) + 2, 40)
                 sheet.column_dimensions[column[0].column_letter].width = width
         wb.save(file_path)
+
+    @staticmethod
+    def excel_display_width(value: object) -> int:
+        text = str(value or "")
+        return sum(2 if unicodedata.east_asian_width(character) in "WF" else 1 for character in text)
+
+    @staticmethod
+    def unique_excel_sheet_title(name: str, used_titles: set[str]) -> str:
+        base = re.sub(r"[\\/*?:\[\]]", "_", name).strip().strip("'") or "参数"
+        base = base[:31]
+        candidate = base
+        suffix_index = 2
+        while candidate.casefold() in used_titles:
+            suffix = f"_{suffix_index}"
+            candidate = base[: 31 - len(suffix)] + suffix
+            suffix_index += 1
+        used_titles.add(candidate.casefold())
+        return candidate
 
     def append_series_value(self, item: SeriesData, timestamp: int, value: int) -> None:
         if item.timestamps and item.timestamps[-1] == timestamp:
@@ -2679,6 +2734,7 @@ class IntegratedTester(QWidget):
         self.temperature_compensation_result = None
         self.temperature_compensation_peak_temperature = None
         self.temperature_compensation_peak_stable_since = None
+        self.stop_temperature_compensation_elapsed()
         self.temperature_compensation_check.blockSignals(True)
         self.temperature_compensation_check.setChecked(False)
         self.temperature_compensation_check.blockSignals(False)
