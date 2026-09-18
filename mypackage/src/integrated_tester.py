@@ -19,6 +19,7 @@ from PyQt5.QtGui import QBrush, QColor, QFont, QPainter, QPen, QTextCursor
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QAction,
+    QApplication,
     QButtonGroup,
     QCheckBox,
     QComboBox,
@@ -47,7 +48,9 @@ from PyQt5.QtWidgets import (
     QStackedWidget,
     QStyle,
     QStyleOptionComboBox,
+    QStyleOptionViewItem,
     QStylePainter,
+    QStyledItemDelegate,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -137,6 +140,45 @@ class PortComboBox(QComboBox):
             option.currentText = str(port_name)
         painter.drawComplexControl(QStyle.CC_ComboBox, option)
         painter.drawControl(QStyle.CE_ComboBoxLabel, option)
+
+
+class TemperatureSeriesNameDelegate(QStyledItemDelegate):
+    SUFFIX = "---(温)"
+    SUFFIX_COLOR = QColor("#d32f2f")
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:
+        display_text = str(index.data(Qt.DisplayRole) or "")
+        if not display_text.endswith(self.SUFFIX):
+            super().paint(painter, option, index)
+            return
+
+        styled_option = QStyleOptionViewItem(option)
+        self.initStyleOption(styled_option, index)
+        styled_option.text = ""
+        style = styled_option.widget.style() if styled_option.widget else QApplication.style()
+        style.drawControl(QStyle.CE_ItemViewItem, styled_option, painter, styled_option.widget)
+
+        text_rect = style.subElementRect(QStyle.SE_ItemViewItemText, styled_option, styled_option.widget)
+        metrics = styled_option.fontMetrics
+        suffix_width = metrics.horizontalAdvance(self.SUFFIX)
+        name = display_text[: -len(self.SUFFIX)]
+        displayed_name = metrics.elidedText(name, Qt.ElideRight, max(0, text_rect.width() - suffix_width))
+        name_width = metrics.horizontalAdvance(displayed_name)
+        baseline = text_rect.y() + (text_rect.height() - metrics.height()) // 2 + metrics.ascent()
+        color_role = (
+            QtGui.QPalette.HighlightedText
+            if styled_option.state & QStyle.State_Selected
+            else QtGui.QPalette.Text
+        )
+
+        painter.save()
+        painter.setClipRect(text_rect)
+        painter.setFont(styled_option.font)
+        painter.setPen(styled_option.palette.color(color_role))
+        painter.drawText(text_rect.x(), baseline, displayed_name)
+        painter.setPen(self.SUFFIX_COLOR)
+        painter.drawText(text_rect.x() + name_width, baseline, self.SUFFIX)
+        painter.restore()
 
 
 @dataclass
@@ -756,7 +798,8 @@ class IntegratedTester(QWidget):
         self.temperature_compensation_elapsed_label.setFixedHeight(24)
         self.temperature_compensation_elapsed_label.setFont(QFont("Consolas", 10, QFont.Bold))
         self.temperature_compensation_elapsed_label.setStyleSheet(
-            "QLabel { background-color: #16a34a; color: white; border-radius: 3px; padding: 0 6px; }"
+            "QLabel { background-color: #e5e7eb; color: #1f2937; "
+            "border: 1px solid #c7cdd4; border-radius: 3px; padding: 0 6px; }"
         )
         self.temperature_compensation_elapsed_timer = QtCore.QTimer(self)
         self.temperature_compensation_elapsed_timer.setInterval(1000)
@@ -817,6 +860,7 @@ class IntegratedTester(QWidget):
 
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["名称", "当前值", "最大值", "最小值"])
+        self.table.setItemDelegateForColumn(0, TemperatureSeriesNameDelegate(self.table))
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -963,6 +1007,7 @@ class IntegratedTester(QWidget):
         self.update_selection_text_position()
         self.update_cursor_text_position()
         self.update_mark_label_positions()
+        self.update_latest_value_labels()
         self.update_y_axis_ticks()
 
     def update_y_axis_ticks(self) -> None:
@@ -1326,6 +1371,12 @@ class IntegratedTester(QWidget):
         curve.setDynamicRangeLimit(None)
         curve.setZValue(5)
         self.plot.addItem(curve)
+        latest_label = pg.TextItem(anchor=(0, 0.5), color=color)
+        latest_label.setFont(QFont("Microsoft YaHei", 8))
+        latest_label.setZValue(16)
+        latest_label.setVisible(False)
+        self.plot.addItem(latest_label, ignoreBounds=True)
+        curve.latest_value_label = latest_label
         return curve
 
     def table_row_for_name(self, name: str) -> int:
@@ -1337,14 +1388,15 @@ class IntegratedTester(QWidget):
 
     @staticmethod
     def display_series_name(name: str, item: SeriesData) -> str:
-        return f"{name}(温)" if item.config.compensation_enabled else name
+        return f"{name}---(温)" if item.config.compensation_enabled else name
 
     @staticmethod
     def table_series_name(item: QTableWidgetItem) -> str:
         stored_name = item.data(Qt.UserRole)
         if stored_name is not None:
             return str(stored_name)
-        return item.text()[:-3] if item.text().endswith("(温)") else item.text()
+        suffix = TemperatureSeriesNameDelegate.SUFFIX
+        return item.text()[: -len(suffix)] if item.text().endswith(suffix) else item.text()
 
     def upsert_series_table_row(self, row: int, name: str, item: SeriesData) -> int:
         if row < 0:
@@ -1383,6 +1435,9 @@ class IntegratedTester(QWidget):
 
     def remove_series_curve(self, item: Optional[SeriesData]) -> None:
         if item and item.curve:
+            latest_label = getattr(item.curve, "latest_value_label", None)
+            if latest_label is not None:
+                self.plot.removeItem(latest_label)
             self.plot.removeItem(item.curve)
             item.curve = None
 
@@ -1687,6 +1742,10 @@ class IntegratedTester(QWidget):
             self.temperature_compensation_peak_temperature = None
             self.temperature_compensation_peak_stable_since = None
             self.stop_temperature_compensation_elapsed()
+            return
+
+        if not self.serial_thread or not self.serial_thread.running:
+            self.reject_temperature_compensation_start("串口未打开，请先打开串口后再启动温补参数统计")
             return
 
         temperature_item = self.temperature_series()
@@ -2107,8 +2166,40 @@ class IntegratedTester(QWidget):
             return
         x_values = [ts - self.start_timestamp for ts in item.timestamps]
         item.curve.setData(x_values, item.values)
+        self.update_latest_value_label(item, x_values)
         if rescale:
             self.rescale_y_axis_to_visible_data()
+
+    def update_latest_value_label(
+        self,
+        item: SeriesData,
+        x_values: Optional[List[float]] = None,
+    ) -> None:
+        if not item.curve:
+            return
+        label = getattr(item.curve, "latest_value_label", None)
+        if label is None:
+            return
+        if not item.visible or not item.values or self.start_timestamp is None:
+            label.setVisible(False)
+            return
+
+        if x_values is None:
+            x_values = [timestamp - self.start_timestamp for timestamp in item.timestamps]
+        if not x_values:
+            label.setVisible(False)
+            return
+
+        x_range = self.plot.getViewBox().viewRange()[0]
+        scene_width = self.plot.getViewBox().sceneBoundingRect().width()
+        pixel_gap = (x_range[1] - x_range[0]) * 4 / scene_width if scene_width > 0 else 0
+        label.setText(f"{item.values[-1]:g}", color=QColor(item.config.color))
+        label.setPos(x_values[-1] + pixel_gap, item.values[-1])
+        label.setVisible(True)
+
+    def update_latest_value_labels(self) -> None:
+        for item in self.series.values():
+            self.update_latest_value_label(item)
 
     def rescale_y_axis_to_visible_data(self) -> None:
         if self._rescaling_y_axis:
@@ -2166,6 +2257,7 @@ class IntegratedTester(QWidget):
         for item in self.series.values():
             if item.curve:
                 item.curve.setVisible(item.visible)
+                self.update_latest_value_label(item)
         self.refresh_plot_legend()
 
     def refresh_plot_legend(self) -> None:
